@@ -1,0 +1,10 @@
+domain: doodle.com
+repo: github.com/doodlescheduling/kubedb
+resources:
+- group: infra
+  kind: MongoDB
+  version: v1beta1
+- group: infra
+  kind: PostgreSQL
+  version: v1beta1
+version: "2"

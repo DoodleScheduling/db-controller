@@ -1,0 +1,15 @@
+apiVersion: infra.doodle.com/v1beta1
+kind: PostgreSQL
+metadata:
+  name: postgresql-sample
+spec:
+  dbName: "postgres_sample"
+  hostName: "posgres"
+  credentials:
+  - username: keycloak
+    vault:
+      useAvailable: true
+      host: vault
+      path: secret/doodle/devbox/keycloak/database
+      userField: USERNAME
+      secretField: PASSWORD

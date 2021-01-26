@@ -1,0 +1,15 @@
+apiVersion: infra.doodle.com/v1beta1
+kind: MongoDB
+metadata:
+  name: mongodb-sample
+spec:
+  dbName: "mongodb_sample"
+  hostName: "mongo"
+  credentials:
+  - username: doodle
+    vault:
+      useAvailable: true
+      host: vault
+      path: secret/doodle/devbox/monolith
+      userField: USERNAME
+      secretField: PASSWORD
