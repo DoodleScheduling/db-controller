@@ -51,13 +51,11 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, errors.Wrap(err, "unable to fetch Mongodb")
 	}
 
-	mongodb.Status.MongoDBAvailabilityStatus = infrav1beta1.Available
-
 	log.Info("updating Mongodb status...")
-	if err := r.Status().Update(ctx, &mongodb); err != nil {
-		log.Error(err, "unable to update Mongodb status")
-		return ctrl.Result{}, err
-	}
+	//if err := r.Status().Update(ctx, &mongodb); err != nil {
+	//	log.Error(err, "unable to update Mongodb status")
+	//	return ctrl.Result{}, err
+	//}
 	log.Info("Mongodb status updated")
 	return ctrl.Result{}, nil
 }

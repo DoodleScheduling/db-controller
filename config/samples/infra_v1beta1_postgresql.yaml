@@ -3,7 +3,7 @@ kind: PostgreSQL
 metadata:
   name: postgresql-sample
 spec:
-  dbName: "postgres_sample"
+  databaseName: "postgres_sample"
   hostName: "posgres"
   credentials:
   - username: keycloak

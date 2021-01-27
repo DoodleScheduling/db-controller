@@ -20,25 +20,49 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DBName string
-type HostName string
+type MongoDBDBName string
+type MongoDBHostName string
+type MongoDBCredentials []MongoDBCredential
+type MongoDBCredential struct {
+	UserName string `json:"username"`
+	Vault    Vault  `json:"vault"`
+}
 
 // MongoDBSpec defines the desired state of MongoDB
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBSpec struct {
 	// Database name
-	DBName DBName `json:"dbName"`
+	DBName MongoDBDBName `json:"dbName"`
 	// Database Server host name
-	HostName HostName `json:"hostName"`
+	HostName MongoDBHostName `json:"hostName"`
 	// Database credentials
-	Credentials Credentials `json:"credentials"`
+	Credentials MongoDBCredentials `json:"credentials"`
+}
+
+type MongoDBStatusCode string
+
+const (
+	MongoDBDatabaseAvailable   MongoDBStatusCode = "Available"
+	MongoDBDatabaseUnavailable                   = "Unavailable"
+	MongoDBDatabasePending                       = "Pending"
+)
+
+type MongoDBDatabaseStatus struct {
+	Status MongoDBStatusCode `json:"status"`
+	DBName MongoDBDBName     `json:"dbName"`
+}
+
+type MongoDBCredentialsStatus []MongoDBCredentialStatus
+type MongoDBCredentialStatus struct {
+	Status   MongoDBStatusCode `json:"status"`
+	Username string            `json:"username"`
 }
 
 // MongoDBStatus defines the observed state of MongoDB
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBStatus struct {
-	MongoDBAvailabilityStatus AvailabilityStatus `json:"database"`
-	CredentialsStatus         CredentialStatus   `json:"credentials"`
+	MongoDBAvailabilityStatus MongoDBDatabaseStatus    `json:"database"`
+	CredentialsStatus         MongoDBCredentialsStatus `json:"credentials"`
 }
 
 // +kubebuilder:object:root=true

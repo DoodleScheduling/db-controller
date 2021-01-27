@@ -20,22 +20,51 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type PostgreSQLDBName string
+type PostgreSQLHostName string
+
+type PostgreSQLCredentials []PostgreSQLCredential
+type PostgreSQLCredential struct {
+	UserName string `json:"username"`
+	Vault    Vault  `json:"vault"`
+}
+
 // PostgreSQLSpec defines the desired state of PostgreSQL
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLSpec struct {
 	// Database name
-	DBName DBName `json:"dbName"`
+	DatabaseName PostgreSQLDBName `json:"databaseName"`
 	// Database Server host name
-	HostName HostName `json:"hostName"`
+	HostName PostgreSQLHostName `json:"hostName"`
 	// Database credentials
-	Credentials Credentials `json:"credentials"`
+	Credentials PostgreSQLCredentials `json:"credentials"`
+}
+
+type PostgreSQLStatusCode string
+
+const (
+	PostgreSQLDatabaseAvailable   PostgreSQLStatusCode = "Available"
+	PostgreSQLDatabaseUnavailable                      = "Unavailable"
+	PostgreSQLDatabasePending                          = "Pending"
+)
+
+type PostgreSQLDatabaseStatus struct {
+	Status  PostgreSQLStatusCode `json:"status"`
+	Message string               `json:"message"`
+	Name    PostgreSQLDBName     `json:"name"`
+}
+
+type PostgreSQLCredentialsStatus []PostgreSQLCredentialStatus
+type PostgreSQLCredentialStatus struct {
+	Status   PostgreSQLStatusCode `json:"status"`
+	Username string               `json:"username"`
 }
 
 // PostgreSQLStatus defines the observed state of PostgreSQL
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLStatus struct {
-	PostgreSQLAvailabilityStatus AvailabilityStatus `json:"database"`
-	CredentialsStatus            CredentialStatus   `json:"credentials"`
+	DatabaseStatus    PostgreSQLDatabaseStatus   `json:"database"`
+	CredentialsStatus PostgreSQLCredentialStatus `json:"credentials"`
 }
 
 // +kubebuilder:object:root=true
