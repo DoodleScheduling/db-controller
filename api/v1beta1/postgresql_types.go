@@ -70,8 +70,8 @@ type PostgreSQLCredentialStatus struct {
 // PostgreSQLStatus defines the observed state of PostgreSQL
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLStatus struct {
-	DatabaseStatus    PostgreSQLDatabaseStatus   `json:"database"`
-	CredentialsStatus PostgreSQLCredentialStatus `json:"credentials"`
+	DatabaseStatus    PostgreSQLDatabaseStatus    `json:"database"`
+	CredentialsStatus PostgreSQLCredentialsStatus `json:"credentials"`
 }
 
 // +kubebuilder:object:root=true
@@ -93,6 +93,14 @@ type PostgreSQLList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PostgreSQL `json:"items"`
+}
+
+func (this *PostgreSQLStatus) SetDatabaseStatus(code PostgreSQLStatusCode, message string, name *PostgreSQLDBName) {
+	this.DatabaseStatus.Status = code
+	this.DatabaseStatus.Message = message
+	if name != nil {
+		this.DatabaseStatus.Name = *name
+	}
 }
 
 func init() {

@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,7 +30,11 @@ import (
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
 )
 
-var servers = make(map[string]*postgresqlAPI.PostgreSQLServer)
+// TODO MOVE TO RECONCILER VARIABLE !!!!
+var serversCache = make(map[string]*postgresqlAPI.PostgreSQLServer)
+
+// is it worth to decrease security for more performance?
+var credentialsCache = make(map[string]string)
 
 // PostgreSQLReconciler reconciles a PostgreSQL object
 type PostgreSQLReconciler struct {
@@ -56,43 +59,66 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return ctrl.Result{}, errors.Wrap(err, "unable to fetch PostgreSQL")
 	}
 
-	// Try to get the connection to server from cache
-	if _, ok := servers[string(postgresql.Spec.Host)]; !ok {
-		log.V(1).Info("connecting to new database host", "host", postgresql.Spec.Host)
-		if server, err := postgresqlAPI.NewPostgreSQLServer(string(postgresql.Spec.Host), fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootCredential.UserName, postgresql.Spec.RootCredential.Password); err != nil {
-			postgresql.Status.DatabaseStatus.Status = infrav1beta1.PostgreSQLDatabaseUnavailable
-			postgresql.Status.DatabaseStatus.Message = "Cannot change the name of the database."
-			return r.updateAndReturn(&ctx, &postgresql, &log)
-		} else {
-			servers[string(postgresql.Spec.Host)] = server
-			log.V(1).Info("successfully connected to database host", "host", postgresql.Spec.Host)
-		}
+	postgreSQLServer, err := r.getAndStore(string(postgresql.Spec.Host), fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootCredential.UserName, postgresql.Spec.RootCredential.Password, &log)
+	if err != nil {
+		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLDatabaseUnavailable, err.Error(), nil)
+		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
-
-	postgreSQLServer := servers[string(postgresql.Spec.Host)]
 	log.V(1).Info("reusing database pool", "host", postgresql.Spec.Host)
 
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
 		// TODO in future, implement FORCE flag. For now, mark status as failed to change db name
-		postgresql.Status.DatabaseStatus.Status = infrav1beta1.PostgreSQLDatabaseUnavailable
-		postgresql.Status.DatabaseStatus.Message = "Cannot change the name of the database."
-		// Remove the entry from cache
-		delete(servers, string(postgresql.Spec.Host))
+		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLDatabaseUnavailable, "Cannot change the name of the database.", nil)
+		delete(serversCache, string(postgresql.Spec.Host))
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	} else {
 		if err := postgreSQLServer.CreateDatabaseIfNotExists(string(postgresql.Spec.DatabaseName)); err != nil {
-			postgresql.Status.DatabaseStatus.Status = infrav1beta1.PostgreSQLDatabaseUnavailable
-			postgresql.Status.DatabaseStatus.Message = err.Error()
-			// Remove the entry from cache
-			delete(servers, string(postgresql.Spec.Host))
+			postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLDatabaseUnavailable, err.Error(), nil)
+			delete(serversCache, string(postgresql.Spec.Host))
 			return r.updateAndReturn(&ctx, &postgresql, &log)
 		} else {
-			postgresql.Status.DatabaseStatus.Status = infrav1beta1.PostgreSQLDatabaseAvailable
-			postgresql.Status.DatabaseStatus.Name = postgresql.Spec.DatabaseName
-			postgresql.Status.DatabaseStatus.Message = "Database up."
+			postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLDatabaseAvailable, "Database up.", &postgresql.Spec.DatabaseName)
 		}
 	}
+
+	if postgresql.Spec.Credentials == nil {
+		// TODO drop users in status?
+		return r.updateAndReturn(&ctx, &postgresql, &log)
+	}
+	if postgresql.Status.CredentialsStatus == nil || len(postgresql.Status.CredentialsStatus) == 0 {
+		// TODO create all users from SPEC
+		return r.updateAndReturn(&ctx, &postgresql, &log)
+	}
+
+	for _, credential := range postgresql.Spec.Credentials {
+		found := false
+		for _, statusCredential := range postgresql.Status.CredentialsStatus {
+			if credential.UserName == statusCredential.Username {
+				found = true
+			}
+		}
+		if !found {
+			// TODO create new user per spec; read credentials from vault
+		}
+	}
+
 	return r.updateAndReturn(&ctx, &postgresql, &log)
+}
+
+// TODO there should be a separate struct representing cache; move the method there
+func (r *PostgreSQLReconciler) getAndStore(host string, port string, rootUsername string, rootPassword string, log *logr.Logger) (*postgresqlAPI.PostgreSQLServer, error) {
+	// Try to get the connection to server from cache
+	if _, ok := serversCache[host]; !ok {
+		(*log).V(1).Info("connecting to new database host", "host", host)
+		if server, err := postgresqlAPI.NewPostgreSQLServer(host, port, rootUsername, rootPassword); err != nil {
+			return nil, err
+		} else {
+			serversCache[host] = server
+			(*log).V(1).Info("successfully connected to database host", "host", host)
+		}
+	}
+
+	return serversCache[host], nil
 }
 
 func (r *PostgreSQLReconciler) SetupWithManager(mgr ctrl.Manager) error {
