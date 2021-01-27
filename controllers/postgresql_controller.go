@@ -83,10 +83,12 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	if postgresql.Spec.Credentials == nil {
 		// TODO drop users in status?
+		postgresql.Status.CredentialsStatus = make([]infrav1beta1.PostgreSQLCredentialStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 	if postgresql.Status.CredentialsStatus == nil || len(postgresql.Status.CredentialsStatus) == 0 {
 		// TODO create all users from SPEC
+		postgresql.Status.CredentialsStatus = make([]infrav1beta1.PostgreSQLCredentialStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 

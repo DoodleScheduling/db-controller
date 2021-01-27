@@ -98,15 +98,17 @@ spec:
             IMPORTANT: Run "make" to regenerate code after modifying this file'
           properties:
             credentials:
-              properties:
-                status:
-                  type: string
-                username:
-                  type: string
-              required:
-              - status
-              - username
-              type: object
+              items:
+                properties:
+                  status:
+                    type: string
+                  username:
+                    type: string
+                required:
+                - status
+                - username
+                type: object
+              type: array
             database:
               properties:
                 message:
