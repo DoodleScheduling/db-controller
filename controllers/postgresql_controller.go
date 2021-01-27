@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	postgresqlAPI "github.com/doodlescheduling/kubedb/db/postgresql"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -54,6 +55,20 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	postgresql.Status.PostgreSQLAvailabilityStatus = infrav1beta1.Available
 
 	log.Info("updating PostgreSQL status...")
+
+	/// check if database status is empty, if yes - need to create new database
+	///// - check if database exists, create if not, update status
+	/// if database status not empty, then
+	///// - check if status == desired
+	//////// if yes, check if database exists, create if not, update status
+	//////// if no, check if status database exists, drop if yes, create desired database, update status
+
+	if greeting, err := postgresqlAPI.NewPostgreSQLServer("postgres-postgresql.devops.svc.cluster.local", "5432", "postgres", "postgres").Connect(); err != nil {
+		log.Error(err, "error connecting to postgres")
+	} else {
+		log.Info("greeting", greeting)
+	}
+
 	if err := r.Status().Update(ctx, &postgresql); err != nil {
 		log.Error(err, "unable to update PostgreSQL status")
 		return ctrl.Result{}, err
