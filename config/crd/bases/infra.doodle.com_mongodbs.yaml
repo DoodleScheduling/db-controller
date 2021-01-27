@@ -1,0 +1,122 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
+  creationTimestamp: null
+  name: mongodbs.infra.doodle.com
+spec:
+  group: infra.doodle.com
+  names:
+    kind: MongoDB
+    listKind: MongoDBList
+    plural: mongodbs
+    singular: mongodb
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: MongoDB is the Schema for the mongodbs API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: 'MongoDBSpec defines the desired state of MongoDB IMPORTANT:
+            Run "make" to regenerate code after modifying this file'
+          properties:
+            credentials:
+              description: Database credentials
+              items:
+                properties:
+                  username:
+                    type: string
+                  vault:
+                    properties:
+                      host:
+                        type: string
+                      path:
+                        type: string
+                      secretField:
+                        type: string
+                      useAvailable:
+                        type: boolean
+                      userField:
+                        type: string
+                    required:
+                    - host
+                    - path
+                    - secretField
+                    - useAvailable
+                    - userField
+                    type: object
+                required:
+                - username
+                - vault
+                type: object
+              type: array
+            dbName:
+              description: Database name
+              type: string
+            hostName:
+              description: Database Server host name
+              type: string
+          required:
+          - credentials
+          - dbName
+          - hostName
+          type: object
+        status:
+          description: 'MongoDBStatus defines the observed state of MongoDB IMPORTANT:
+            Run "make" to regenerate code after modifying this file'
+          properties:
+            credentials:
+              items:
+                properties:
+                  status:
+                    type: string
+                  username:
+                    type: string
+                required:
+                - status
+                - username
+                type: object
+              type: array
+            database:
+              properties:
+                dbName:
+                  type: string
+                status:
+                  type: string
+              required:
+              - dbName
+              - status
+              type: object
+          required:
+          - credentials
+          - database
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

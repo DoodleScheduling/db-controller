@@ -23,6 +23,11 @@ import (
 type PostgreSQLDBName string
 type PostgreSQLHostName string
 
+type PostgreSQLRootCredential struct {
+	UserName string `json:"username"`
+	Password string `json:"password"` // TODO just for testing, this MUST be replaced with secretRef lookup
+}
+
 type PostgreSQLCredentials []PostgreSQLCredential
 type PostgreSQLCredential struct {
 	UserName string `json:"username"`
@@ -35,7 +40,9 @@ type PostgreSQLSpec struct {
 	// Database name
 	DatabaseName PostgreSQLDBName `json:"databaseName"`
 	// Database Server host name
-	HostName PostgreSQLHostName `json:"hostName"`
+	Host           PostgreSQLHostName       `json:"host"`
+	Port           int64                    `json:"port"`
+	RootCredential PostgreSQLRootCredential `json:"root"`
 	// Database credentials
 	Credentials PostgreSQLCredentials `json:"credentials"`
 }
