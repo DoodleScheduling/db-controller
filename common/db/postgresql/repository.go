@@ -32,9 +32,6 @@ func NewPostgreSQLServer(host string, port string, rootUser string, rootPassword
 
 // TODO Prepared Statements
 func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
-	if s == nil || s.dbpool == nil {
-		return errors.New("dbpool is empty")
-	}
 	if databaseExists, err := s.doesDatabaseExist(database); err != nil {
 		return err
 	} else {
@@ -57,6 +54,56 @@ func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
 	}
 }
 
+func (s *PostgreSQLServer) SetupUser(user string, password string, database string) error {
+	if err := s.createUserIfNotExists(user); err != nil {
+		return err
+	}
+	if err := s.setPasswordForUser(user, password); err != nil {
+		return err
+	}
+	if err := s.grantAllPrivileges(user, database); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostgreSQLServer) createUserIfNotExists(user string) error {
+	if userExists, err := s.doesUserExist(user); err != nil {
+		return err
+	} else {
+		if userExists {
+			return nil
+		}
+		if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("CREATE USER \"%s\";", user)); err != nil {
+			return err
+		} else {
+			if userExistsNow, err := s.doesUserExist(user); err != nil {
+				return err
+			} else {
+				if userExistsNow {
+					return nil
+				} else {
+					return errors.New("user doesn't exist after create")
+				}
+			}
+		}
+	}
+}
+
+func (s *PostgreSQLServer) setPasswordForUser(user string, password string) error {
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("ALTER USER \"%s\" WITH ENCRYPTED PASSWORD '%s';", user, password)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostgreSQLServer) grantAllPrivileges(user string, database string) error {
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *PostgreSQLServer) connect() (*pgxpool.Pool, error) {
 	dbpool, err := pgxpool.Connect(context.Background(), fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres", s.Host, s.Port, s.RootUser, s.RootPassword))
 	if err != nil {
@@ -66,11 +113,20 @@ func (s *PostgreSQLServer) connect() (*pgxpool.Pool, error) {
 }
 
 func (s *PostgreSQLServer) doesDatabaseExist(database string) (bool, error) {
-	if s == nil || s.dbpool == nil {
-		return false, errors.New("dbpool is empty")
-	}
 	var result int64
 	err := s.dbpool.QueryRow(context.Background(), fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s';", database)).Scan(&result)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return result == 1, nil
+}
+
+func (s *PostgreSQLServer) doesUserExist(user string) (bool, error) {
+	var result int64
+	err := s.dbpool.QueryRow(context.Background(), fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s';", user)).Scan(&result)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil

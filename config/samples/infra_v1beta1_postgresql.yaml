@@ -2,18 +2,28 @@ apiVersion: infra.doodle.com/v1beta1
 kind: PostgreSQL
 metadata:
   name: postgresql-sample
+  namespace: devops
 spec:
   databaseName: "postgres_sample"
-  host: "postgres-postgresql.devops.svc.cluster.local"
+  host: postgres-postgresql.devops
   port: 5432
-  root:
-    username: postgres
-    password: postgres
+  rootUsername: postgres
+  rootSecretLookup:
+    name: postgres-postgresql
+    namespace: devops
+    field: postgresql-password
   credentials:
   - username: keycloak
     vault:
       useAvailable: true
-      host: vault
+      host: vault.devops
+      path: secret/doodle/devbox/keycloak/database
+      userField: USERNAME
+      secretField: PASSWORD
+  - username: replication
+    vault:
+      useAvailable: true
+      host: vault.devops
       path: secret/doodle/devbox/keycloak/database
       userField: USERNAME
       secretField: PASSWORD

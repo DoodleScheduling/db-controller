@@ -17,15 +17,19 @@ limitations under the License.
 package v1beta1
 
 import (
+	"errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const DEFAULT_POSTGRESQL_ROOT_USER = "postgres"
 
 type PostgreSQLDBName string
 type PostgreSQLHostName string
 
-type PostgreSQLRootCredential struct {
-	UserName string `json:"username"`
-	Password string `json:"password"` // TODO just for testing, this MUST be replaced with secretRef lookup
+type PostgreSQLRootSecretLookup struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Field     string `json:"field"`
 }
 
 type PostgreSQLCredentials []PostgreSQLCredential
@@ -40,9 +44,11 @@ type PostgreSQLSpec struct {
 	// Database name
 	DatabaseName PostgreSQLDBName `json:"databaseName"`
 	// Database Server host name
-	Host           PostgreSQLHostName       `json:"host"`
-	Port           int64                    `json:"port"`
-	RootCredential PostgreSQLRootCredential `json:"root"`
+	Host PostgreSQLHostName `json:"host"`
+	Port int64              `json:"port"`
+	// +optional
+	RootUsername     string                     `json:"rootUsername"`
+	RootSecretLookup PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
 	// Database credentials
 	Credentials PostgreSQLCredentials `json:"credentials"`
 }
@@ -50,9 +56,9 @@ type PostgreSQLSpec struct {
 type PostgreSQLStatusCode string
 
 const (
-	PostgreSQLDatabaseAvailable   PostgreSQLStatusCode = "Available"
-	PostgreSQLDatabaseUnavailable                      = "Unavailable"
-	PostgreSQLDatabasePending                          = "Pending"
+	PostgreSQLAvailable   PostgreSQLStatusCode = "Available"
+	PostgreSQLUnavailable                      = "Unavailable"
+	PostgreSQLPending                          = "Pending"
 )
 
 type PostgreSQLDatabaseStatus struct {
@@ -61,9 +67,10 @@ type PostgreSQLDatabaseStatus struct {
 	Name    PostgreSQLDBName     `json:"name"`
 }
 
-type PostgreSQLCredentialsStatus []PostgreSQLCredentialStatus
+type PostgreSQLCredentialsStatus []*PostgreSQLCredentialStatus
 type PostgreSQLCredentialStatus struct {
 	Status   PostgreSQLStatusCode `json:"status"`
+	Message  string               `json:"message"`
 	Username string               `json:"username"`
 }
 
@@ -72,6 +79,7 @@ type PostgreSQLCredentialStatus struct {
 type PostgreSQLStatus struct {
 	DatabaseStatus    PostgreSQLDatabaseStatus    `json:"database"`
 	CredentialsStatus PostgreSQLCredentialsStatus `json:"credentials"`
+	LastUpdateTime    metav1.Time                 `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true
@@ -95,12 +103,56 @@ type PostgreSQLList struct {
 	Items           []PostgreSQL `json:"items"`
 }
 
+func (statuses *PostgreSQLCredentialsStatus) Filter(predicate func(*PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
+	for _, status := range *statuses {
+		if predicate(status) {
+			return status
+		}
+	}
+	return nil
+}
+
+func (statuses *PostgreSQLCredentialsStatus) FindOrCreate(name string, predicate func(status *PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
+	postgresqlCredentialStatus := statuses.Filter(predicate)
+	if postgresqlCredentialStatus == nil {
+		postgresqlCredentialStatus = &PostgreSQLCredentialStatus{
+			Username: name,
+		}
+		*statuses = append(*statuses, postgresqlCredentialStatus)
+	}
+	return postgresqlCredentialStatus
+}
+
+func (this *PostgreSQLCredentialStatus) SetCredentialsStatus(code PostgreSQLStatusCode, message string) {
+	this.Status = code
+	this.Message = message
+}
+
 func (this *PostgreSQLStatus) SetDatabaseStatus(code PostgreSQLStatusCode, message string, name *PostgreSQLDBName) {
 	this.DatabaseStatus.Status = code
 	this.DatabaseStatus.Message = message
 	if name != nil {
 		this.DatabaseStatus.Name = *name
 	}
+}
+
+func (this *PostgreSQL) SetDefaults() error {
+	if this.Spec.RootUsername == "" {
+		this.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
+	}
+	if this.Spec.RootSecretLookup.Name == "" {
+		return errors.New("must specify root secret")
+	}
+	if this.Spec.RootSecretLookup.Field == "" {
+		return errors.New("must specify root secret field")
+	}
+	if this.Spec.RootSecretLookup.Namespace == "" {
+		this.Spec.RootSecretLookup.Namespace = this.ObjectMeta.Namespace
+	}
+	if this.Status.CredentialsStatus == nil || len(this.Status.CredentialsStatus) == 0 {
+		this.Status.CredentialsStatus = make([]*PostgreSQLCredentialStatus, 0)
+	}
+	return nil
 }
 
 func init() {
