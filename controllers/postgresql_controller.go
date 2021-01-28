@@ -91,7 +91,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 
 	if postgresql.Spec.Credentials == nil {
-		postgresql.Status.CredentialsStatus.Apply(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
+		postgresql.Status.CredentialsStatus.ForEach(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
 			_ = postgreSQLServer.DropUser(status.Username, string(postgresql.Status.DatabaseStatus.Name))
 		})
 		postgresql.Status.CredentialsStatus = make([]*infrav1beta1.PostgreSQLCredentialStatus, 0)
@@ -112,31 +112,9 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		}
 	}
 
-	credentialsStatusToDelete := make(infrav1beta1.PostgreSQLCredentialsStatus, 0)
-	for _, credentialStatus := range postgresql.Status.CredentialsStatus {
-		found := false
-		for _, credential := range postgresql.Spec.Credentials {
-			if credentialStatus.Username == credential.UserName {
-				found = true
-			}
-		}
-		if !found {
-			credentialsStatusToDelete = append(credentialsStatusToDelete, credentialStatus)
-		}
-	}
-	credentialsStatusToDelete.Apply(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
+	postgresql.AlignCredentialsStatus().ForEach(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
 		_ = postgreSQLServer.DropUser(status.Username, string(postgresql.Status.DatabaseStatus.Name))
 	})
-	for i := 0; i < len(postgresql.Status.CredentialsStatus); i++ {
-		status := postgresql.Status.CredentialsStatus[i]
-		for _, deleted := range credentialsStatusToDelete {
-			if status.Username == deleted.Username {
-				postgresql.Status.CredentialsStatus = append(postgresql.Status.CredentialsStatus[:i], postgresql.Status.CredentialsStatus[i+1:]...)
-				i--
-				break
-			}
-		}
-	}
 
 	return r.updateAndReturn(&ctx, &postgresql, &log)
 }

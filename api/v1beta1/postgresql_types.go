@@ -103,7 +103,7 @@ type PostgreSQLList struct {
 	Items           []PostgreSQL `json:"items"`
 }
 
-func (statuses *PostgreSQLCredentialsStatus) Apply(consumer func(*PostgreSQLCredentialStatus)) {
+func (statuses *PostgreSQLCredentialsStatus) ForEach(consumer func(*PostgreSQLCredentialStatus)) {
 	for _, status := range *statuses {
 		consumer(status)
 	}
@@ -116,6 +116,34 @@ func (statuses *PostgreSQLCredentialsStatus) Filter(predicate func(*PostgreSQLCr
 		}
 	}
 	return nil
+}
+
+/*
+	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
+	Returns removed statuses.
+*/
+func (postgresql *PostgreSQL) AlignCredentialsStatus() *PostgreSQLCredentialsStatus {
+	removedStatuses := make(PostgreSQLCredentialsStatus, 0)
+	statuses := &postgresql.Status.CredentialsStatus
+	for i := 0; i < len(*statuses); i++ {
+		status := (*statuses)[i]
+		found := false
+		if status != nil {
+			for _, credential := range postgresql.Spec.Credentials {
+				if credential.UserName == status.Username {
+					found = true
+				}
+			}
+		}
+		if !found {
+			removedStatuses = append(removedStatuses, status)
+			s := append((*statuses)[:i], (*statuses)[i+1:]...)
+			statuses = &s
+			i--
+		}
+	}
+	postgresql.Status.CredentialsStatus = *statuses
+	return &removedStatuses
 }
 
 func (statuses *PostgreSQLCredentialsStatus) FindOrCreate(name string, predicate func(status *PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
