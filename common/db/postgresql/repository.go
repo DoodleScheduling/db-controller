@@ -67,6 +67,16 @@ func (s *PostgreSQLServer) SetupUser(user string, password string, database stri
 	return nil
 }
 
+func (s *PostgreSQLServer) DropUser(user string, database string) error {
+	if err := s.revokeAllPrivileges(user, database); err != nil {
+		return err
+	}
+	if err := s.dropUserIfNotExist(user); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *PostgreSQLServer) createUserIfNotExists(user string) error {
 	if userExists, err := s.doesUserExist(user); err != nil {
 		return err
@@ -90,6 +100,29 @@ func (s *PostgreSQLServer) createUserIfNotExists(user string) error {
 	}
 }
 
+func (s *PostgreSQLServer) dropUserIfNotExist(user string) error {
+	if userExists, err := s.doesUserExist(user); err != nil {
+		return err
+	} else {
+		if !userExists {
+			return nil
+		}
+		if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("DROP USER \"%s\";", user)); err != nil {
+			return err
+		} else {
+			if userExistsNow, err := s.doesUserExist(user); err != nil {
+				return err
+			} else {
+				if !userExistsNow {
+					return nil
+				} else {
+					return errors.New("user still exists after drop")
+				}
+			}
+		}
+	}
+}
+
 func (s *PostgreSQLServer) setPasswordForUser(user string, password string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("ALTER USER \"%s\" WITH ENCRYPTED PASSWORD '%s';", user, password)); err != nil {
 		return err
@@ -99,6 +132,13 @@ func (s *PostgreSQLServer) setPasswordForUser(user string, password string) erro
 
 func (s *PostgreSQLServer) grantAllPrivileges(user string, database string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostgreSQLServer) revokeAllPrivileges(user string, database string) error {
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\";", database, user)); err != nil {
 		return err
 	}
 	return nil

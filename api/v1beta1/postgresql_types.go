@@ -103,6 +103,12 @@ type PostgreSQLList struct {
 	Items           []PostgreSQL `json:"items"`
 }
 
+func (statuses *PostgreSQLCredentialsStatus) Apply(consumer func(*PostgreSQLCredentialStatus)) {
+	for _, status := range *statuses {
+		consumer(status)
+	}
+}
+
 func (statuses *PostgreSQLCredentialsStatus) Filter(predicate func(*PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
 	for _, status := range *statuses {
 		if predicate(status) {
