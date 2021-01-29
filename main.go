@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,6 +65,18 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	// Liveness probe
+	err = mgr.AddHealthzCheck("healthz", healthz.Ping)
+	if err != nil {
+		os.Exit(1)
+	}
+
+	// Readiness probe
+	err = mgr.AddReadyzCheck("readyz", healthz.Ping)
+	if err != nil {
 		os.Exit(1)
 	}
 
