@@ -98,15 +98,22 @@ spec:
               properties:
                 dbName:
                   type: string
+                message:
+                  type: string
                 status:
                   type: string
               required:
               - dbName
+              - message
               - status
               type: object
+            lastUpdateTime:
+              format: date-time
+              type: string
           required:
           - credentials
           - database
+          - lastUpdateTime
           type: object
       type: object
   version: v1beta1

@@ -48,8 +48,9 @@ const (
 )
 
 type MongoDBDatabaseStatus struct {
-	Status MongoDBStatusCode `json:"status"`
-	DBName MongoDBDBName     `json:"dbName"`
+	Status  MongoDBStatusCode `json:"status"`
+	Message string            `json:"message"`
+	DBName  MongoDBDBName     `json:"dbName"`
 }
 
 type MongoDBCredentialsStatus []MongoDBCredentialStatus
@@ -63,6 +64,7 @@ type MongoDBCredentialStatus struct {
 type MongoDBStatus struct {
 	MongoDBAvailabilityStatus MongoDBDatabaseStatus    `json:"database"`
 	CredentialsStatus         MongoDBCredentialsStatus `json:"credentials"`
+	LastUpdateTime            metav1.Time              `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true
