@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -74,10 +75,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDB")
 		os.Exit(1)
 	}
+	postgreSQLServerCache := postgresqlAPI.NewCache()
 	if err = (&controllers.PostgreSQLReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("PostgreSQL"),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQL"),
+		Scheme:      mgr.GetScheme(),
+		ServerCache: postgreSQLServerCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQL")
 		os.Exit(1)

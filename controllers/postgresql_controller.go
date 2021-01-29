@@ -32,14 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TODO MOVE TO RECONCILER VARIABLE !!!!
-var serversCache = make(map[string]*postgresqlAPI.PostgreSQLServer)
-
 // PostgreSQLReconciler reconciles a PostgreSQL object
 type PostgreSQLReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log         logr.Logger
+	Scheme      *runtime.Scheme
+	ServerCache *postgresqlAPI.Cache
 }
 
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqls,verbs=get;list;watch;create;update;patch;delete
@@ -69,7 +67,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
-	postgreSQLServer, err := r.getAndStore(string(postgresql.Spec.Host), fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootUsername, rootPassword, &log)
+	postgreSQLServer, err := r.ServerCache.Get(string(postgresql.Spec.Host), fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootUsername, rootPassword)
 	if err != nil {
 		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
@@ -78,12 +76,12 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
 		// TODO in future, implement FORCE flag? For now, mark status as failed to change db name. Admission control webhook can disallow this change also.
 		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, "Cannot change the name of the database.", nil)
-		delete(serversCache, string(postgresql.Spec.Host))
+		r.ServerCache.Remove(string(postgresql.Spec.Host))
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	} else {
 		if err := postgreSQLServer.CreateDatabaseIfNotExists(string(postgresql.Spec.DatabaseName)); err != nil {
 			postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
-			delete(serversCache, string(postgresql.Spec.Host))
+			r.ServerCache.Remove(string(postgresql.Spec.Host))
 			return r.updateAndReturn(&ctx, &postgresql, &log)
 		} else {
 			postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLAvailable, "Database up.", &postgresql.Spec.DatabaseName)
@@ -128,22 +126,6 @@ func (r *PostgreSQLReconciler) getRootPassword(ctx *context.Context, name string
 		return "", errors.New("there is no root secret field entry under specified rootSecret field")
 	}
 	return string(rootSecret.Data[field][:]), nil
-}
-
-// TODO there should be a separate struct representing cache; move the method there
-func (r *PostgreSQLReconciler) getAndStore(host string, port string, rootUsername string, rootPassword string, log *logr.Logger) (*postgresqlAPI.PostgreSQLServer, error) {
-	// Try to get the connection to server from cache
-	if _, ok := serversCache[host]; !ok {
-		(*log).V(1).Info("connecting to new database host", "host", host)
-		if server, err := postgresqlAPI.NewPostgreSQLServer(host, port, rootUsername, rootPassword); err != nil {
-			return nil, err
-		} else {
-			serversCache[host] = server
-			(*log).V(1).Info("successfully connected to database host", "host", host)
-		}
-	}
-
-	return serversCache[host], nil
 }
 
 func (r *PostgreSQLReconciler) SetupWithManager(mgr ctrl.Manager) error {
