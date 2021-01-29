@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"github.com/doodlescheduling/kubedb/common/vault"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
@@ -80,6 +81,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// General setup
+	vaultCache := vault.NewCache()
+
+	// MongoDB setup
 	if err = (&controllers.MongoDBReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("MongoDB"),
@@ -88,12 +93,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDB")
 		os.Exit(1)
 	}
+
+	// PostgreSQL setup
 	postgreSQLServerCache := postgresqlAPI.NewCache()
 	if err = (&controllers.PostgreSQLReconciler{
 		Client:      mgr.GetClient(),
 		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQL"),
 		Scheme:      mgr.GetScheme(),
 		ServerCache: postgreSQLServerCache,
+		VaultCache:  vaultCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQL")
 		os.Exit(1)

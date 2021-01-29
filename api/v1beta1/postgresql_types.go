@@ -122,7 +122,7 @@ func (statuses *PostgreSQLCredentialsStatus) Filter(predicate func(*PostgreSQLCr
 	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
 	Returns removed statuses.
 */
-func (postgresql *PostgreSQL) AlignCredentialsStatus() *PostgreSQLCredentialsStatus {
+func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *PostgreSQLCredentialsStatus {
 	removedStatuses := make(PostgreSQLCredentialsStatus, 0)
 	statuses := &postgresql.Status.CredentialsStatus
 	for i := 0; i < len(*statuses); i++ {
