@@ -92,7 +92,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
-	// for now, disallow database renaming
+	// TODO for now, disallow database renaming
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
 		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "")
 		r.ServerCache.Remove(postgresql.Spec.Host)

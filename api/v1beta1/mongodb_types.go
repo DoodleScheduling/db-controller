@@ -30,9 +30,13 @@ type MongoDBCredential struct {
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBSpec struct {
 	// Database name
-	DBName string `json:"dbName"`
-	// Database Server host name
+	DatabaseName string `json:"databaseName"`
+	// Database Server host name and port
 	HostName string `json:"hostName"`
+	// +optional
+	RootUsername string `json:"rootUsername"`
+	// +optional
+	RootAuthenticationDatabase string `json:"rootAuthDatabase"`
 	// Database credentials
 	Credentials MongoDBCredentials `json:"credentials"`
 }

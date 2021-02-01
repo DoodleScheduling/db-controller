@@ -67,15 +67,19 @@ spec:
                 - vault
                 type: object
               type: array
-            dbName:
+            databaseName:
               description: Database name
               type: string
             hostName:
-              description: Database Server host name
+              description: Database Server host name and port
+              type: string
+            rootAuthDatabase:
+              type: string
+            rootUsername:
               type: string
           required:
           - credentials
-          - dbName
+          - databaseName
           - hostName
           type: object
         status:

@@ -2,14 +2,21 @@ apiVersion: infra.doodle.com/v1beta1
 kind: MongoDB
 metadata:
   name: mongodb-sample
+  namespace: devops
 spec:
-  dbName: "mongodb_sample"
-  hostName: "mongo"
+  databaseName: "mongodb_sample"
+  hostName: "mongodb.devops:27017"
+  rootUsername: root
+  rootAuthDatabase: admin
+  rootSecretLookup:
+    name: mongodb
+    namespace: devops
+    field: mongodb-root-password
   credentials:
-  - username: doodle
+  - username: admin
     vault:
       useAvailable: true
-      host: vault
+      host: vault.devops
       path: secret/doodle/devbox/monolith
       userField: USERNAME
       secretField: PASSWORD

@@ -59,34 +59,33 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	s := make(infrav1beta1.CredentialsStatus, 0)
 	mongodb.Status.CredentialsStatus = s
 
-	mongodbserver, err := mongodbAPI.NewMongoDBServer("mongodb.devops", "27017", "root", "admin", "admin")
+	mongodbserver, err := mongodbAPI.NewMongoDBServer(mongodb.Spec.HostName, mongodb.Spec.RootUsername, "admin", mongodb.Spec.RootAuthenticationDatabase)
 	if err != nil {
 		log.Error(err, "Error while connecting to mongodb")
 		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Unavailable
 		mongodb.Status.DatabaseStatus.Message = err.Error()
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
-	if u, err := mongodbserver.DoesUserExist("admin", "admin"); err != nil {
-		log.Error(err, "Error while getting user")
-		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
-		mongodb.Status.DatabaseStatus.Message = err.Error()
-		return r.updateAndReturn(&ctx, &mongodb, &log)
-	} else {
-		if u == nil {
-			log.Info("user is nil")
+
+	for _, credential := range mongodb.Spec.Credentials {
+		if u, err := mongodbserver.DoesUserExist(mongodb.Spec.DatabaseName, credential.UserName); err != nil {
+			log.Error(err, "Error while getting user", "user", credential.UserName)
+			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
+			mongodb.Status.DatabaseStatus.Message = err.Error()
+			return r.updateAndReturn(&ctx, &mongodb, &log)
 		} else {
-			log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
+			if u == nil {
+				log.Info("user is nil")
+			} else {
+				log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
+			}
+			//log.Info("user returned", "user", u)
+			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
+			mongodb.Status.DatabaseStatus.Message = "Database up."
 		}
-		//log.Info("user returned", "user", u)
-		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
 	}
 
-	//if err := r.Status().Update(ctx, &mongodb); err != nil {
-	//	log.Error(err, "unable to update Mongodb status")
-	//	return ctrl.Result{}, err
-	//}
-	log.Info("Mongodb status updated")
-	return ctrl.Result{}, nil
+	return r.updateAndReturn(&ctx, &mongodb, &log)
 }
 
 func (r *MongoDBReconciler) SetupWithManager(mgr ctrl.Manager) error {

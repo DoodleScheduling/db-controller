@@ -32,14 +32,13 @@ type UserHolder struct {
 
 type MongoDBServer struct {
 	client *mongo.Client
-	Host   string
-	Port   string
+	URI    string
 }
 
-func NewMongoDBServer(host string, port string, rootUser string, rootPassword string, authenticationDatabase string) (*MongoDBServer, error) {
+func NewMongoDBServer(uri string, rootUser string, rootPassword string, authenticationDatabase string) (*MongoDBServer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	o := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", host, port))
+	o := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s", uri))
 	o.SetMaxPoolSize(100)
 	o.SetAuth(options.Credential{
 		AuthMechanism: "SCRAM-SHA-1",
@@ -56,8 +55,7 @@ func NewMongoDBServer(host string, port string, rootUser string, rootPassword st
 	}
 	return &MongoDBServer{
 		client: client,
-		Host:   host,
-		Port:   port,
+		URI:    uri,
 	}, nil
 }
 
