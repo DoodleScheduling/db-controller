@@ -11,9 +11,9 @@ func NewCache() *Cache {
 	}
 }
 
-func (c *Cache) Get(host string, port string, rootUsername string, rootPassword string) (*PostgreSQLServer, error) {
+func (c *Cache) Get(host string, rootUsername string, rootPassword string, rootAuthenticationDatabase string) (*PostgreSQLServer, error) {
 	if _, ok := c.cache[host]; !ok {
-		if server, err := NewPostgreSQLServer(host, port, rootUsername, rootPassword); err != nil {
+		if server, err := NewPostgreSQLServer(host, rootUsername, rootPassword, rootAuthenticationDatabase); err != nil {
 			return nil, err
 		} else {
 			c.cache[host] = server

@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
 	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
@@ -68,44 +67,64 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	// set spec defaults. Does not mutate the spec, since we are not updating resource
 	if err := postgresql.SetDefaults(); err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// get root database password from k8s secret
 	rootPassword, err := r.getRootPassword(&ctx, postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
-	// postgresql connection, cached
-	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.Host, fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootUsername, rootPassword)
+	// if host is changed, drop credentials for old host. Keep database & data for now, until we figure out what we'll do with it
+	// TODO refactor to have a general garbage collector mechanism, instead of code throughout controller
+	if postgresql.Spec.Host != postgresql.Status.DatabaseStatus.Host {
+		// we might not be able to login with these old credentials anymore
+		postgreSQLServerOld, err := r.ServerCache.Get(postgresql.Status.DatabaseStatus.Host, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
+		if err != nil {
+			// ignore the error for now
+		} else {
+			postgresql.Status.CredentialsStatus.ForEach(func(status *infrav1beta1.CredentialStatus) {
+				_ = postgreSQLServerOld.DropUser(status.Username, postgresql.Status.DatabaseStatus.Name)
+			})
+		}
+	}
+
+	// postgresql connection to spec host, cached
+	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.Host, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 	// vault connection, cached
 	vault, err := r.VaultCache.Get(postgresql.Spec.RootSecretLookup.Name)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// TODO for now, disallow database renaming
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "", postgresql.Spec.Host)
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		r.ServerCache.Remove(postgresql.Spec.Host)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// Setup database
 	if err := postgreSQLServer.CreateDatabaseIfNotExists(postgresql.Spec.DatabaseName); err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		r.ServerCache.Remove(postgresql.Spec.Host)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
-	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName)
+	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName, postgresql.Spec.Host)
 
 	// Delete all credentials if they exist, and are no longer required by spec
 	if postgresql.Spec.Credentials == nil {

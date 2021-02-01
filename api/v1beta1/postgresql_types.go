@@ -21,7 +21,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const DEFAULT_POSTGRESQL_ROOT_USER = "postgres"
+// defaults
+const (
+	DEFAULT_POSTGRESQL_ROOT_USER         = "postgres"
+	DEFAULT_ROOT_AUTHENTICATION_DATABASE = "postgres"
+)
 
 type PostgreSQLRootSecretLookup struct {
 	Name      string `json:"name"`
@@ -44,8 +48,10 @@ type PostgreSQLSpec struct {
 	Host string `json:"host"`
 	Port int64  `json:"port"`
 	// +optional
-	RootUsername     string                     `json:"rootUsername"`
-	RootSecretLookup PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
+	RootUsername string `json:"rootUsername"`
+	// +optional
+	RootAuthenticationDatabase string                     `json:"rootAuthDatabase"`
+	RootSecretLookup           PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
 	// Database credentials
 	Credentials PostgreSQLCredentials `json:"credentials"`
 }
@@ -110,6 +116,9 @@ func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *CredentialsStat
 func (this *PostgreSQL) SetDefaults() error {
 	if this.Spec.RootUsername == "" {
 		this.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
+	}
+	if this.Spec.RootAuthenticationDatabase == "" {
+		this.Spec.RootAuthenticationDatabase = DEFAULT_ROOT_AUTHENTICATION_DATABASE
 	}
 	if this.Spec.RootSecretLookup.Name == "" {
 		return errors.New("must specify root secret")

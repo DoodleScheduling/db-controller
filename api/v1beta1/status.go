@@ -51,12 +51,16 @@ type DatabaseStatus struct {
 	Status  StatusCode `json:"status"`
 	Message string     `json:"message"`
 	Name    string     `json:"name"`
+	Host    string     `json:"host"`
 }
 
-func (s *DatabaseStatus) SetDatabaseStatus(code StatusCode, message string, name string) {
+func (s *DatabaseStatus) SetDatabaseStatus(code StatusCode, message string, name string, host string) {
 	s.Status = code
 	s.Message = message
 	if name != "" {
 		s.Name = name
+	}
+	if host != "" {
+		s.Host = host
 	}
 }

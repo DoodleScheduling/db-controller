@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,18 +67,18 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	for _, credential := range mongodb.Spec.Credentials {
-		if u, err := mongodbserver.DoesUserExist(mongodb.Spec.DatabaseName, credential.UserName); err != nil {
+		if u, err := mongodbserver.SetupUser(mongodb.Spec.DatabaseName, credential.UserName, "password"); err != nil {
 			log.Error(err, "Error while getting user", "user", credential.UserName)
 			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
 			mongodb.Status.DatabaseStatus.Message = err.Error()
 			return r.updateAndReturn(&ctx, &mongodb, &log)
 		} else {
-			if u == nil {
-				log.Info("user is nil")
-			} else {
-				log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
-			}
-			//log.Info("user returned", "user", u)
+			//if u == nil {
+			//	log.Info("user is nil")
+			//} else {
+			//	log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
+			//}
+			log.Info("user returned", "user", u)
 			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
 			mongodb.Status.DatabaseStatus.Message = "Database up."
 		}

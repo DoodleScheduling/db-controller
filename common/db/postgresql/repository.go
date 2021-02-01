@@ -11,22 +11,27 @@ import (
 type PostgreSQLServer struct {
 	dbpool       *pgxpool.Pool
 	Host         string
-	Port         string
 	RootUser     string
 	RootPassword string
+	RootDatabase string
 }
 
-func NewPostgreSQLServer(host string, port string, rootUser string, rootPassword string) (*PostgreSQLServer, error) {
-	dbpool, err := pgxpool.Connect(context.Background(), fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres", host, port, rootUser, rootPassword))
+func getPostgreSQLConnectionURI(host string, rootUser string, rootPassword string, rootDatabase string) string {
+	// alternative dsn string: "host=%s port=%s user=%s password=%s dbname=%s"
+	return fmt.Sprintf("postgresql://%s:%s@%s/%s", rootUser, rootPassword, host, rootDatabase)
+}
+
+func NewPostgreSQLServer(host string, rootUser string, rootPassword string, rootDatabase string) (*PostgreSQLServer, error) {
+	dbpool, err := pgxpool.Connect(context.Background(), getPostgreSQLConnectionURI(host, rootUser, rootPassword, rootDatabase))
 	if err != nil {
 		return nil, err
 	}
 	return &PostgreSQLServer{
 		dbpool:       dbpool,
 		Host:         host,
-		Port:         port,
 		RootUser:     rootUser,
 		RootPassword: rootPassword,
+		RootDatabase: rootDatabase,
 	}, nil
 }
 
@@ -142,14 +147,6 @@ func (s *PostgreSQLServer) revokeAllPrivileges(user string, database string) err
 		return err
 	}
 	return nil
-}
-
-func (s *PostgreSQLServer) connect() (*pgxpool.Pool, error) {
-	dbpool, err := pgxpool.Connect(context.Background(), fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres", s.Host, s.Port, s.RootUser, s.RootPassword))
-	if err != nil {
-		return nil, err
-	}
-	return dbpool, nil
 }
 
 func (s *PostgreSQLServer) doesDatabaseExist(database string) (bool, error) {

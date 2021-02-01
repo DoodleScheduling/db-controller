@@ -103,6 +103,8 @@ spec:
               type: array
             database:
               properties:
+                host:
+                  type: string
                 message:
                   type: string
                 name:
@@ -110,6 +112,7 @@ spec:
                 status:
                   type: string
               required:
+              - host
               - message
               - name
               - status

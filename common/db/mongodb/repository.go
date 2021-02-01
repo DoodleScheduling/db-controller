@@ -31,8 +31,9 @@ type UserHolder struct {
 }
 
 type MongoDBServer struct {
-	client *mongo.Client
-	URI    string
+	client                 *mongo.Client
+	uri                    string
+	authenticationDatabase string
 }
 
 func NewMongoDBServer(uri string, rootUser string, rootPassword string, authenticationDatabase string) (*MongoDBServer, error) {
@@ -54,31 +55,53 @@ func NewMongoDBServer(uri string, rootUser string, rootPassword string, authenti
 		return nil, err
 	}
 	return &MongoDBServer{
-		client: client,
-		URI:    uri,
+		client:                 client,
+		uri:                    uri,
+		authenticationDatabase: authenticationDatabase,
 	}, nil
 }
 
-func (m *MongoDBServer) SetupUser() {
-
+func (m *MongoDBServer) SetupUser(database string, username string, password string) (string, error) {
+	doesUserExist, err := m.doesUserExist(database, username)
+	if err != nil {
+		return "", err
+	}
+	if !doesUserExist {
+		return m.createUser(database, username, password)
+	}
+	return "user already exists", nil
 }
 
-func (m *MongoDBServer) DoesUserExist(database string, username string) (*Users, error) {
+func (m *MongoDBServer) doesUserExist(database string, username string) (bool, error) {
 	command := &bson.D{primitive.E{Key: "usersInfo", Value: username}}
 	r := m.runCommand(database, command)
 	if err := r.Err(); err != nil {
-		return nil, err
+		return false, err
 	}
 	var user Users
 	if err := r.Decode(&user); err != nil {
-		return nil, err
+		return false, err
 	}
-	return &user, nil
+	if user.Users == nil || len(user.Users) == 0 {
+		return false, nil
+	}
+	return true, nil
 	//if br, err := r.DecodeBytes(); err != nil {
 	//	return "", err
 	//} else {
 	//	return br.String(), nil
 	//}
+}
+
+func (m *MongoDBServer) createUser(database string, username string, password string) (string, error) {
+	//command := &bson.D{{"createUser", username}, {"pwd", password}, {"roles", []bson.M{{"role": "readWrite", "db": database}}}}
+	//r := m.runCommand(m.authenticationDatabase, command)
+	//if br, err := r.DecodeBytes(); err != nil {
+	//	return "", err
+	//} else {
+	//	return br.String(), nil
+	//}
+	return "", nil
 }
 
 func (m *MongoDBServer) runCommand(database string, command *bson.D) *mongo.SingleResult {
