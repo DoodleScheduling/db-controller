@@ -20,8 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type MongoDBDBName string
-type MongoDBHostName string
 type MongoDBCredentials []MongoDBCredential
 type MongoDBCredential struct {
 	UserName string `json:"username"`
@@ -32,39 +30,19 @@ type MongoDBCredential struct {
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBSpec struct {
 	// Database name
-	DBName MongoDBDBName `json:"dbName"`
+	DBName string `json:"dbName"`
 	// Database Server host name
-	HostName MongoDBHostName `json:"hostName"`
+	HostName string `json:"hostName"`
 	// Database credentials
 	Credentials MongoDBCredentials `json:"credentials"`
-}
-
-type MongoDBStatusCode string
-
-const (
-	MongoDBDatabaseAvailable   MongoDBStatusCode = "Available"
-	MongoDBDatabaseUnavailable                   = "Unavailable"
-	MongoDBDatabasePending                       = "Pending"
-)
-
-type MongoDBDatabaseStatus struct {
-	Status  MongoDBStatusCode `json:"status"`
-	Message string            `json:"message"`
-	DBName  MongoDBDBName     `json:"dbName"`
-}
-
-type MongoDBCredentialsStatus []MongoDBCredentialStatus
-type MongoDBCredentialStatus struct {
-	Status   MongoDBStatusCode `json:"status"`
-	Username string            `json:"username"`
 }
 
 // MongoDBStatus defines the observed state of MongoDB
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBStatus struct {
-	MongoDBAvailabilityStatus MongoDBDatabaseStatus    `json:"database"`
-	CredentialsStatus         MongoDBCredentialsStatus `json:"credentials"`
-	LastUpdateTime            metav1.Time              `json:"lastUpdateTime"`
+	DatabaseStatus    DatabaseStatus    `json:"database"`
+	CredentialsStatus CredentialsStatus `json:"credentials"`
+	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true

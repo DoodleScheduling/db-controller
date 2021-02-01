@@ -56,20 +56,20 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	log.Info("updating Mongodb status...")
 
-	s := make(infrav1beta1.MongoDBCredentialsStatus, 0)
+	s := make(infrav1beta1.CredentialsStatus, 0)
 	mongodb.Status.CredentialsStatus = s
 
 	mongodbserver, err := mongodbAPI.NewMongoDBServer("mongodb.devops", "27017", "root", "admin", "admin")
 	if err != nil {
 		log.Error(err, "Error while connecting to mongodb")
-		mongodb.Status.MongoDBAvailabilityStatus.Status = infrav1beta1.MongoDBDatabaseUnavailable
-		mongodb.Status.MongoDBAvailabilityStatus.Message = err.Error()
+		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Unavailable
+		mongodb.Status.DatabaseStatus.Message = err.Error()
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
 	if u, err := mongodbserver.DoesUserExist("admin", "admin"); err != nil {
 		log.Error(err, "Error while getting user")
-		mongodb.Status.MongoDBAvailabilityStatus.Status = infrav1beta1.MongoDBDatabaseUnavailable
-		mongodb.Status.MongoDBAvailabilityStatus.Message = err.Error()
+		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
+		mongodb.Status.DatabaseStatus.Message = err.Error()
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	} else {
 		if u == nil {
@@ -78,7 +78,7 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
 		}
 		//log.Info("user returned", "user", u)
-		mongodb.Status.MongoDBAvailabilityStatus.Status = infrav1beta1.MongoDBDatabaseAvailable
+		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
 	}
 
 	//if err := r.Status().Update(ctx, &mongodb); err != nil {

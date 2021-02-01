@@ -23,9 +23,6 @@ import (
 
 const DEFAULT_POSTGRESQL_ROOT_USER = "postgres"
 
-type PostgreSQLDBName string
-type PostgreSQLHostName string
-
 type PostgreSQLRootSecretLookup struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
@@ -42,10 +39,10 @@ type PostgreSQLCredential struct {
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLSpec struct {
 	// Database name
-	DatabaseName PostgreSQLDBName `json:"databaseName"`
+	DatabaseName string `json:"databaseName"`
 	// Database Server host name
-	Host PostgreSQLHostName `json:"host"`
-	Port int64              `json:"port"`
+	Host string `json:"host"`
+	Port int64  `json:"port"`
 	// +optional
 	RootUsername     string                     `json:"rootUsername"`
 	RootSecretLookup PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
@@ -53,33 +50,12 @@ type PostgreSQLSpec struct {
 	Credentials PostgreSQLCredentials `json:"credentials"`
 }
 
-type PostgreSQLStatusCode string
-
-const (
-	PostgreSQLAvailable   PostgreSQLStatusCode = "Available"
-	PostgreSQLUnavailable                      = "Unavailable"
-	PostgreSQLPending                          = "Pending"
-)
-
-type PostgreSQLDatabaseStatus struct {
-	Status  PostgreSQLStatusCode `json:"status"`
-	Message string               `json:"message"`
-	Name    PostgreSQLDBName     `json:"name"`
-}
-
-type PostgreSQLCredentialsStatus []*PostgreSQLCredentialStatus
-type PostgreSQLCredentialStatus struct {
-	Status   PostgreSQLStatusCode `json:"status"`
-	Message  string               `json:"message"`
-	Username string               `json:"username"`
-}
-
 // PostgreSQLStatus defines the observed state of PostgreSQL
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLStatus struct {
-	DatabaseStatus    PostgreSQLDatabaseStatus    `json:"database"`
-	CredentialsStatus PostgreSQLCredentialsStatus `json:"credentials"`
-	LastUpdateTime    metav1.Time                 `json:"lastUpdateTime"`
+	DatabaseStatus    DatabaseStatus    `json:"database"`
+	CredentialsStatus CredentialsStatus `json:"credentials"`
+	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true
@@ -103,27 +79,12 @@ type PostgreSQLList struct {
 	Items           []PostgreSQL `json:"items"`
 }
 
-func (statuses *PostgreSQLCredentialsStatus) ForEach(consumer func(*PostgreSQLCredentialStatus)) {
-	for _, status := range *statuses {
-		consumer(status)
-	}
-}
-
-func (statuses *PostgreSQLCredentialsStatus) Filter(predicate func(*PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
-	for _, status := range *statuses {
-		if predicate(status) {
-			return status
-		}
-	}
-	return nil
-}
-
 /*
 	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
 	Returns removed statuses.
 */
-func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *PostgreSQLCredentialsStatus {
-	removedStatuses := make(PostgreSQLCredentialsStatus, 0)
+func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *CredentialsStatus {
+	removedStatuses := make(CredentialsStatus, 0)
 	statuses := &postgresql.Status.CredentialsStatus
 	for i := 0; i < len(*statuses); i++ {
 		status := (*statuses)[i]
@@ -146,30 +107,6 @@ func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *PostgreSQLCrede
 	return &removedStatuses
 }
 
-func (statuses *PostgreSQLCredentialsStatus) FindOrCreate(name string, predicate func(status *PostgreSQLCredentialStatus) bool) *PostgreSQLCredentialStatus {
-	postgresqlCredentialStatus := statuses.Filter(predicate)
-	if postgresqlCredentialStatus == nil {
-		postgresqlCredentialStatus = &PostgreSQLCredentialStatus{
-			Username: name,
-		}
-		*statuses = append(*statuses, postgresqlCredentialStatus)
-	}
-	return postgresqlCredentialStatus
-}
-
-func (this *PostgreSQLCredentialStatus) SetCredentialsStatus(code PostgreSQLStatusCode, message string) {
-	this.Status = code
-	this.Message = message
-}
-
-func (this *PostgreSQLStatus) SetDatabaseStatus(code PostgreSQLStatusCode, message string, name *PostgreSQLDBName) {
-	this.DatabaseStatus.Status = code
-	this.DatabaseStatus.Message = message
-	if name != nil {
-		this.DatabaseStatus.Name = *name
-	}
-}
-
 func (this *PostgreSQL) SetDefaults() error {
 	if this.Spec.RootUsername == "" {
 		this.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
@@ -184,7 +121,7 @@ func (this *PostgreSQL) SetDefaults() error {
 		this.Spec.RootSecretLookup.Namespace = this.ObjectMeta.Namespace
 	}
 	if this.Status.CredentialsStatus == nil || len(this.Status.CredentialsStatus) == 0 {
-		this.Status.CredentialsStatus = make([]*PostgreSQLCredentialStatus, 0)
+		this.Status.CredentialsStatus = make([]*CredentialStatus, 0)
 	}
 	return nil
 }

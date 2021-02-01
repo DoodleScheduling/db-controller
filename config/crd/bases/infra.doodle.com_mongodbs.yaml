@@ -85,26 +85,29 @@ spec:
             credentials:
               items:
                 properties:
+                  message:
+                    type: string
                   status:
                     type: string
                   username:
                     type: string
                 required:
+                - message
                 - status
                 - username
                 type: object
               type: array
             database:
               properties:
-                dbName:
-                  type: string
                 message:
+                  type: string
+                name:
                   type: string
                 status:
                   type: string
               required:
-              - dbName
               - message
+              - name
               - status
               type: object
             lastUpdateTime:

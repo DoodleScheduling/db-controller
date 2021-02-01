@@ -68,79 +68,79 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	// set spec defaults. Does not mutate the spec, since we are not updating resource
 	if err := postgresql.SetDefaults(); err != nil {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// get root database password from k8s secret
 	rootPassword, err := r.getRootPassword(&ctx, postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
 	if err != nil {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// postgresql connection, cached
-	postgreSQLServer, err := r.ServerCache.Get(string(postgresql.Spec.Host), fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootUsername, rootPassword)
+	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.Host, fmt.Sprintf("%d", postgresql.Spec.Port), postgresql.Spec.RootUsername, rootPassword)
 	if err != nil {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 	// vault connection, cached
 	vault, err := r.VaultCache.Get(postgresql.Spec.RootSecretLookup.Name)
 	if err != nil {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// for now, disallow database renaming
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, "Cannot change the name of the database.", nil)
-		r.ServerCache.Remove(string(postgresql.Spec.Host))
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "")
+		r.ServerCache.Remove(postgresql.Spec.Host)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// Setup database
-	if err := postgreSQLServer.CreateDatabaseIfNotExists(string(postgresql.Spec.DatabaseName)); err != nil {
-		postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLUnavailable, err.Error(), nil)
-		r.ServerCache.Remove(string(postgresql.Spec.Host))
+	if err := postgreSQLServer.CreateDatabaseIfNotExists(postgresql.Spec.DatabaseName); err != nil {
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "")
+		r.ServerCache.Remove(postgresql.Spec.Host)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
-	postgresql.Status.SetDatabaseStatus(infrav1beta1.PostgreSQLAvailable, "Database up.", &postgresql.Spec.DatabaseName)
+	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName)
 
 	// Delete all credentials if they exist, and are no longer required by spec
 	if postgresql.Spec.Credentials == nil {
-		postgresql.Status.CredentialsStatus.ForEach(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
-			_ = postgreSQLServer.DropUser(status.Username, string(postgresql.Status.DatabaseStatus.Name))
+		postgresql.Status.CredentialsStatus.ForEach(func(status *infrav1beta1.CredentialStatus) {
+			_ = postgreSQLServer.DropUser(status.Username, postgresql.Status.DatabaseStatus.Name)
 		})
-		postgresql.Status.CredentialsStatus = make([]*infrav1beta1.PostgreSQLCredentialStatus, 0)
+		postgresql.Status.CredentialsStatus = make([]*infrav1beta1.CredentialStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// setup credentials as per spec
 	for _, credential := range postgresql.Spec.Credentials {
 		username := credential.UserName
-		postgreSQLCredentialStatus := postgresql.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.PostgreSQLCredentialStatus) bool {
+		postgreSQLCredentialStatus := postgresql.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
 			return status != nil && status.Username == username
 		})
 		// get user credentials from vault
 		vaultResponse, err := vault.Get(vaultAPI.VaultRequest{})
 		if err != nil {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.PostgreSQLUnavailable, err.Error())
+			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 			continue
 		}
 		password := vaultResponse.Secret
 
 		// setup user credentials and privileges
-		if err := postgreSQLServer.SetupUser(username, password, string(postgresql.Spec.DatabaseName)); err != nil {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.PostgreSQLUnavailable, err.Error())
+		if err := postgreSQLServer.SetupUser(username, password, postgresql.Spec.DatabaseName); err != nil {
+			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 		} else {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.PostgreSQLAvailable, "Credentials up.")
+			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
 		}
 	}
 
 	// remove all statuses for credentials that are no longer required by spec, and delete users in database
-	postgresql.RemoveUnneededCredentialsStatus().ForEach(func(status *infrav1beta1.PostgreSQLCredentialStatus) {
-		_ = postgreSQLServer.DropUser(status.Username, string(postgresql.Status.DatabaseStatus.Name))
+	postgresql.RemoveUnneededCredentialsStatus().ForEach(func(status *infrav1beta1.CredentialStatus) {
+		_ = postgreSQLServer.DropUser(status.Username, postgresql.Status.DatabaseStatus.Name)
 	})
 
 	return r.updateAndReturn(&ctx, &postgresql, &log)
