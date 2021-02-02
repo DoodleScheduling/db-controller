@@ -20,6 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type MongoDBRootSecretLookup struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Field     string `json:"field"`
+}
+
 type MongoDBCredentials []MongoDBCredential
 type MongoDBCredential struct {
 	UserName string `json:"username"`
@@ -29,16 +35,14 @@ type MongoDBCredential struct {
 // MongoDBSpec defines the desired state of MongoDB
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBSpec struct {
-	// Database name
 	DatabaseName string `json:"databaseName"`
-	// Database Server host name and port
-	HostName string `json:"hostName"`
+	HostName     string `json:"hostName"`
 	// +optional
 	RootUsername string `json:"rootUsername"`
 	// +optional
-	RootAuthenticationDatabase string `json:"rootAuthDatabase"`
-	// Database credentials
-	Credentials MongoDBCredentials `json:"credentials"`
+	RootAuthenticationDatabase string                  `json:"rootAuthDatabase"`
+	RootSecretLookup           MongoDBRootSecretLookup `json:"rootSecretLookup"`
+	Credentials                MongoDBCredentials      `json:"credentials"`
 }
 
 // MongoDBStatus defines the observed state of MongoDB

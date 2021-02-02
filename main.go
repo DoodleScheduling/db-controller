@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 	"github.com/doodlescheduling/kubedb/common/vault"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -85,10 +86,13 @@ func main() {
 	vaultCache := vault.NewCache()
 
 	// MongoDB setup
+	mongoDBServerCache := mongodbAPI.NewCache()
 	if err = (&controllers.MongoDBReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MongoDB"),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Log:         ctrl.Log.WithName("controllers").WithName("MongoDB"),
+		Scheme:      mgr.GetScheme(),
+		ServerCache: mongoDBServerCache,
+		VaultCache:  vaultCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDB")
 		os.Exit(1)

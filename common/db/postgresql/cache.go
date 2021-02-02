@@ -23,5 +23,9 @@ func (c *Cache) Get(host string, rootUsername string, rootPassword string, rootA
 }
 
 func (c *Cache) Remove(host string) {
+	server := c.cache[host]
+	if server != nil {
+		server.Close()
+	}
 	delete(c.cache, host)
 }

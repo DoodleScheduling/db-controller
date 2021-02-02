@@ -5,8 +5,7 @@ metadata:
   namespace: devops
 spec:
   databaseName: "postgres_sample"
-  host: postgres-postgresql.devops
-  port: 5432
+  hostName: "postgres-postgresql.devops:5432"
   rootUsername: postgres
   rootSecretLookup:
     name: postgres-postgresql

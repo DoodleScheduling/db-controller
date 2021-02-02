@@ -22,19 +22,11 @@ import (
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
 	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-// errors
-var (
-	ErrNoRootSecret = errors.New("there is no root secret field entry under specified rootSecret field")
 )
 
 // PostgreSQLReconciler reconciles a PostgreSQL object
@@ -53,6 +45,9 @@ type PostgreSQLReconciler struct {
 func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("postgresql", req.NamespacedName)
+
+	// common controller functions
+	cw := NewControllerWrapper(*r, &ctx)
 
 	// get postgresql resource by namespaced name
 	var postgresql infrav1beta1.PostgreSQL
@@ -73,7 +68,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 
 	// get root database password from k8s secret
-	rootPassword, err := r.getRootPassword(&ctx, postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
+	rootPassword, err := cw.GetRootPassword(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
 	if err != nil {
 		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
@@ -83,7 +78,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	// - garbage collection
 	// if host is changed, drop credentials for old host. Keep database & data for now, until we figure out what we'll do with it
 	// TODO refactor to have a general garbage collector mechanism, instead of code throughout controller
-	if postgresql.Spec.Host != postgresql.Status.DatabaseStatus.Host {
+	if postgresql.Spec.HostName != postgresql.Status.DatabaseStatus.Host {
 		// we might not be able to login with these old credentials anymore
 		postgreSQLServerOld, err := r.ServerCache.Get(postgresql.Status.DatabaseStatus.Host, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
 		if err != nil {
@@ -96,16 +91,16 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 
 	// postgresql connection to spec host, cached
-	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.Host, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
+	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.HostName, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName)
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 	// vault connection, cached
 	vault, err := r.VaultCache.Get(postgresql.Spec.RootSecretLookup.Name)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName)
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
@@ -113,20 +108,20 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	// - garbage collection
 	// TODO for now, disallow database renaming
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "", postgresql.Spec.Host)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "", postgresql.Spec.HostName)
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		r.ServerCache.Remove(postgresql.Spec.Host)
+		r.ServerCache.Remove(postgresql.Spec.HostName)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
 	// Setup database
 	if err := postgreSQLServer.CreateDatabaseIfNotExists(postgresql.Spec.DatabaseName); err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.Host)
+		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName)
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		r.ServerCache.Remove(postgresql.Spec.Host)
+		r.ServerCache.Remove(postgresql.Spec.HostName)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
-	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName, postgresql.Spec.Host)
+	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName, postgresql.Spec.HostName)
 
 	// - garbage collection
 	// Delete all credentials if they exist, and are no longer required by spec
@@ -167,17 +162,6 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	})
 
 	return r.updateAndReturn(&ctx, &postgresql, &log)
-}
-
-func (r *PostgreSQLReconciler) getRootPassword(ctx *context.Context, name string, namespace string, field string) (string, error) {
-	var rootSecret v12.Secret
-	if err := (*r).Get(*ctx, types.NamespacedName{Name: name, Namespace: namespace}, &rootSecret); err != nil {
-		return "", err
-	}
-	if len(rootSecret.Data[field]) == 0 {
-		return "", ErrNoRootSecret
-	}
-	return string(rootSecret.Data[field][:]), nil
 }
 
 func (r *PostgreSQLReconciler) SetupWithManager(mgr ctrl.Manager) error {

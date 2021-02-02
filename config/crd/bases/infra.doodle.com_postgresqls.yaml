@@ -38,7 +38,6 @@ spec:
             Run "make" to regenerate code after modifying this file'
           properties:
             credentials:
-              description: Database credentials
               items:
                 properties:
                   username:
@@ -68,14 +67,9 @@ spec:
                 type: object
               type: array
             databaseName:
-              description: Database name
               type: string
-            host:
-              description: Database Server host name
+            hostName:
               type: string
-            port:
-              format: int64
-              type: integer
             rootAuthDatabase:
               type: string
             rootSecretLookup:
@@ -96,8 +90,7 @@ spec:
           required:
           - credentials
           - databaseName
-          - host
-          - port
+          - hostName
           - rootSecretLookup
           type: object
         status:

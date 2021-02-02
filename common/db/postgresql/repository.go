@@ -35,6 +35,10 @@ func NewPostgreSQLServer(host string, rootUser string, rootPassword string, root
 	}, nil
 }
 
+func (s *PostgreSQLServer) Close() {
+	s.dbpool.Close()
+}
+
 // TODO Prepared Statements
 func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
 	if databaseExists, err := s.doesDatabaseExist(database); err != nil {

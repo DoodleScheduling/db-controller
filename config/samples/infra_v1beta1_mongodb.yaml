@@ -13,7 +13,21 @@ spec:
     namespace: devops
     field: mongodb-root-password
   credentials:
-  - username: admin
+  - username: doodle
+    vault:
+      useAvailable: true
+      host: vault.devops
+      path: secret/doodle/devbox/monolith
+      userField: USERNAME
+      secretField: PASSWORD
+  - username: keycloak
+    vault:
+      useAvailable: true
+      host: vault.devops
+      path: secret/doodle/devbox/monolith
+      userField: USERNAME
+      secretField: PASSWORD
+  - username: monolith-doodle
     vault:
       useAvailable: true
       host: vault.devops

@@ -42,18 +42,14 @@ type PostgreSQLCredential struct {
 // PostgreSQLSpec defines the desired state of PostgreSQL
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLSpec struct {
-	// Database name
 	DatabaseName string `json:"databaseName"`
-	// Database Server host name
-	Host string `json:"host"`
-	Port int64  `json:"port"`
+	HostName     string `json:"hostName"`
 	// +optional
 	RootUsername string `json:"rootUsername"`
 	// +optional
 	RootAuthenticationDatabase string                     `json:"rootAuthDatabase"`
 	RootSecretLookup           PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
-	// Database credentials
-	Credentials PostgreSQLCredentials `json:"credentials"`
+	Credentials                PostgreSQLCredentials      `json:"credentials"`
 }
 
 // PostgreSQLStatus defines the observed state of PostgreSQL

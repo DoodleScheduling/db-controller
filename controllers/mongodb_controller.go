@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,10 @@ import (
 // MongoDBReconciler reconciles a MongoDB object
 type MongoDBReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log         logr.Logger
+	Scheme      *runtime.Scheme
+	ServerCache *mongodbAPI.Cache
+	VaultCache  *vaultAPI.Cache
 }
 
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbs,verbs=get;list;watch;create;update;patch;delete
@@ -44,6 +47,9 @@ type MongoDBReconciler struct {
 func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("mongodb", req.NamespacedName)
+
+	// common controller functions
+	cw := NewControllerWrapper(*r, &ctx)
 
 	var mongodb infrav1beta1.MongoDB
 	if err := r.Get(ctx, req.NamespacedName, &mongodb); err != nil {
@@ -58,7 +64,16 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	s := make(infrav1beta1.CredentialsStatus, 0)
 	mongodb.Status.CredentialsStatus = s
 
-	mongodbserver, err := mongodbAPI.NewMongoDBServer(mongodb.Spec.HostName, mongodb.Spec.RootUsername, "admin", mongodb.Spec.RootAuthenticationDatabase)
+	// root password
+	rootPassword, err := cw.GetRootPassword(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
+	if err != nil {
+		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &mongodb, &log)
+	}
+
+	// mongoDB server
+	mongoDBServer, err := r.ServerCache.Get(mongodb.Spec.HostName, mongodb.Spec.RootUsername, rootPassword, mongodb.Spec.RootAuthenticationDatabase)
 	if err != nil {
 		log.Error(err, "Error while connecting to mongodb")
 		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Unavailable
@@ -66,23 +81,34 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
 
+	// vault connection, cached
+	vault, err := r.VaultCache.Get(mongodb.Spec.RootSecretLookup.Name)
+	if err != nil {
+		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName)
+		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &mongodb, &log)
+	}
+
 	for _, credential := range mongodb.Spec.Credentials {
-		if u, err := mongodbserver.SetupUser(mongodb.Spec.DatabaseName, credential.UserName, "password"); err != nil {
-			log.Error(err, "Error while getting user", "user", credential.UserName)
-			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
-			mongodb.Status.DatabaseStatus.Message = err.Error()
-			return r.updateAndReturn(&ctx, &mongodb, &log)
+		username := credential.UserName
+		mongodbCredentialStatus := mongodb.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
+			return status != nil && status.Username == username
+		})
+		// get user credentials from vault
+		vaultResponse, err := vault.Get(vaultAPI.VaultRequest{})
+		if err != nil {
+			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
+			continue
+		}
+		password := vaultResponse.Secret
+		if err := mongoDBServer.SetupUser(mongodb.Spec.DatabaseName, username, password); err != nil {
+			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 		} else {
-			//if u == nil {
-			//	log.Info("user is nil")
-			//} else {
-			//	log.Info("user returned", "whole struct", fmt.Sprintf("%+v", u))
-			//}
-			log.Info("user returned", "user", u)
-			mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
-			mongodb.Status.DatabaseStatus.Message = "Database up."
+			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
 		}
 	}
+	mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
+	mongodb.Status.DatabaseStatus.Message = "Database up."
 
 	return r.updateAndReturn(&ctx, &mongodb, &log)
 }
