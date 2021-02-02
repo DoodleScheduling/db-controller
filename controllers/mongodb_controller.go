@@ -59,8 +59,6 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, errors.Wrap(err, "unable to fetch Mongodb")
 	}
 
-	log.Info("updating Mongodb status...")
-
 	s := make(infrav1beta1.CredentialsStatus, 0)
 	mongodb.Status.CredentialsStatus = s
 

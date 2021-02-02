@@ -120,12 +120,32 @@ spec:
                   type: string
                 name:
                   type: string
+                rootAuthDatabase:
+                  type: string
+                rootSecretLookup:
+                  properties:
+                    field:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  required:
+                  - field
+                  - name
+                  - namespace
+                  type: object
+                rootUsername:
+                  type: string
                 status:
                   type: string
               required:
               - host
               - message
               - name
+              - rootAuthDatabase
+              - rootSecretLookup
+              - rootUsername
               - status
               type: object
             lastUpdateTime:

@@ -48,13 +48,22 @@ func (s *CredentialStatus) SetCredentialsStatus(code StatusCode, message string)
 }
 
 type DatabaseStatus struct {
-	Status  StatusCode `json:"status"`
-	Message string     `json:"message"`
-	Name    string     `json:"name"`
-	Host    string     `json:"host"`
+	Status                     StatusCode             `json:"status"`
+	Message                    string                 `json:"message"`
+	Name                       string                 `json:"name"`
+	Host                       string                 `json:"host"`
+	RootUsername               string                 `json:"rootUsername"`
+	RootAuthenticationDatabase string                 `json:"rootAuthDatabase"`
+	RootSecretLookup           StatusRootSecretLookup `json:"rootSecretLookup"`
 }
 
-func (s *DatabaseStatus) SetDatabaseStatus(code StatusCode, message string, name string, host string) {
+type StatusRootSecretLookup struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Field     string `json:"field"`
+}
+
+func (s *DatabaseStatus) SetDatabaseStatus(code StatusCode, message string, name string, host string) *DatabaseStatus {
 	s.Status = code
 	s.Message = message
 	if name != "" {
@@ -63,4 +72,24 @@ func (s *DatabaseStatus) SetDatabaseStatus(code StatusCode, message string, name
 	if host != "" {
 		s.Host = host
 	}
+	return s
+}
+
+func (s *DatabaseStatus) WithUsername(rootUsername string) *DatabaseStatus {
+	s.RootUsername = rootUsername
+	return s
+}
+
+func (s *DatabaseStatus) WithAuthDatabase(rootAuthenticationDatabase string) *DatabaseStatus {
+	s.RootAuthenticationDatabase = rootAuthenticationDatabase
+	return s
+}
+
+func (s *DatabaseStatus) WithRootSecretLookup(name string, namespace string, field string) *DatabaseStatus {
+	s.RootSecretLookup = StatusRootSecretLookup{
+		Name:      name,
+		Namespace: namespace,
+		Field:     field,
+	}
+	return s
 }
