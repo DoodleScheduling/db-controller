@@ -80,6 +80,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
+	// - garbage collection
 	// if host is changed, drop credentials for old host. Keep database & data for now, until we figure out what we'll do with it
 	// TODO refactor to have a general garbage collector mechanism, instead of code throughout controller
 	if postgresql.Spec.Host != postgresql.Status.DatabaseStatus.Host {
@@ -109,6 +110,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
 
+	// - garbage collection
 	// TODO for now, disallow database renaming
 	if postgresql.Spec.DatabaseName != postgresql.Status.DatabaseStatus.Name && postgresql.Status.DatabaseStatus.Name != "" {
 		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, "Cannot change the name of the database.", "", postgresql.Spec.Host)
@@ -126,6 +128,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName, postgresql.Spec.Host)
 
+	// - garbage collection
 	// Delete all credentials if they exist, and are no longer required by spec
 	if postgresql.Spec.Credentials == nil {
 		postgresql.Status.CredentialsStatus.ForEach(func(status *infrav1beta1.CredentialStatus) {
@@ -157,6 +160,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		}
 	}
 
+	// - garbage collection
 	// remove all statuses for credentials that are no longer required by spec, and delete users in database
 	postgresql.RemoveUnneededCredentialsStatus().ForEach(func(status *infrav1beta1.CredentialStatus) {
 		_ = postgreSQLServer.DropUser(status.Username, postgresql.Status.DatabaseStatus.Name)
