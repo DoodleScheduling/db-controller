@@ -7,12 +7,12 @@ import (
 )
 
 type PostgreSQLGarbageCollector struct {
-	r   *PostgreSQLReconciler
+	r   *PostgreSQLDatabaseReconciler
 	cw  *ControllerWrapper
 	log *logr.Logger
 }
 
-func NewPostgreSQLGarbageCollector(r *PostgreSQLReconciler, cw *ControllerWrapper, log *logr.Logger) *PostgreSQLGarbageCollector {
+func NewPostgreSQLGarbageCollector(r *PostgreSQLDatabaseReconciler, cw *ControllerWrapper, log *logr.Logger) *PostgreSQLGarbageCollector {
 	return &PostgreSQLGarbageCollector{
 		r:   r,
 		cw:  cw,
@@ -63,7 +63,6 @@ func (g *PostgreSQLGarbageCollector) handleHostOrDatabaseChange(postgreSQLServer
 
 func (g *PostgreSQLGarbageCollector) handleUnneededCredentials(postgreSQLServer *postgresqlAPI.PostgreSQLServer, database *infrav1beta1.PostgreSQLDatabase) error {
 	var errToReturn error
-	// - garbage collection
 	// remove all statuses for credentials that are no longer required by spec, and delete users in database
 	database.RemoveUnneededCredentialsStatus().ForEach(func(status *infrav1beta1.CredentialStatus) {
 		errToReturn = postgreSQLServer.DropUser(database.Status.DatabaseStatus.Name, status.Username)

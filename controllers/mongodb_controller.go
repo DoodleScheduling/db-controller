@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// MongoDBReconciler reconciles a MongoDB object
-type MongoDBReconciler struct {
+// MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
+type MongoDBDatabaseReconciler struct {
 	client.Client
 	Log         logr.Logger
 	Scheme      *runtime.Scheme
@@ -38,22 +38,22 @@ type MongoDBReconciler struct {
 	VaultCache  *vaultAPI.Cache
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *MongoDBDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("mongodb", req.NamespacedName)
+	log := r.Log.WithValues("mongodbdatabase", req.NamespacedName)
 
 	// common controller functions
 	cw := NewControllerWrapper(*r, &ctx)
 	// garbage collector
 	gc := NewMongoDBGarbageCollector(r, cw, &log)
 
-	// get mongodb resource by namespaced name
-	var mongodb infrav1beta1.MongoDB
-	if err := r.Get(ctx, req.NamespacedName, &mongodb); err != nil {
+	// get database resource by namespaced name
+	var database infrav1beta1.MongoDBDatabase
+	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
 		if apierrors.IsNotFound(err) {
 			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
 			// How to do it, though? Resource doesn't exist anymore, so we need to list all databases and all manifests and compare?
@@ -63,51 +63,51 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// set spec defaults. Does not mutate the spec, since we are not updating resource
-	if err := mongodb.SetDefaults(); err != nil {
-		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &mongodb, &log)
+	if err := database.SetDefaults(); err != nil {
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	if err := gc.Clean(&mongodb); err != nil {
+	if err := gc.Clean(&database); err != nil {
 		log.Info("Error while cleaning garbage", "error", err)
 	}
 
 	// get root database password from k8s secret
-	rootPassword, err := cw.GetRootPassword(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
+	rootPassword, err := cw.GetRootPassword(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
 	if err != nil {
-		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &mongodb, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// mongoDB connection to spec host, cached
-	mongoDBServer, err := r.ServerCache.Get(mongodb.Spec.HostName, mongodb.Spec.RootUsername, rootPassword, mongodb.Spec.RootAuthenticationDatabase)
+	mongoDBServer, err := r.ServerCache.Get(database.Spec.HostName, database.Spec.RootUsername, rootPassword, database.Spec.RootAuthenticationDatabase)
 	if err != nil {
-		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName).
-			WithUsername(mongodb.Spec.RootUsername).
-			WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
-		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &mongodb, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
+			WithUsername(database.Spec.RootUsername).
+			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// vault connection, cached
-	vault, err := r.VaultCache.Get(mongodb.Spec.RootSecretLookup.Name)
+	vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
 	if err != nil {
-		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName).
-			WithUsername(mongodb.Spec.RootUsername).
-			WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
-		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &mongodb, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
+			WithUsername(database.Spec.RootUsername).
+			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// setup credentials as per spec
-	for _, credential := range mongodb.Spec.Credentials {
+	for _, credential := range database.Spec.Credentials {
 		username := credential.UserName
-		mongodbCredentialStatus := mongodb.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
+		mongodbCredentialStatus := database.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
 			return status != nil && status.Username == username
 		})
 		// get user credentials from vault
@@ -117,7 +117,7 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			continue
 		}
 		password := vaultResponse.Secret
-		if err := mongoDBServer.SetupUser(mongodb.Spec.DatabaseName, username, password); err != nil {
+		if err := mongoDBServer.SetupUser(database.Spec.DatabaseName, username, password); err != nil {
 			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 		} else {
 			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
@@ -125,24 +125,24 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// setup database status - database is automatically set up with credentials
-	mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", mongodb.Spec.DatabaseName, mongodb.Spec.HostName).
-		WithUsername(mongodb.Spec.RootUsername).
-		WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
-		WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
+	database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", database.Spec.DatabaseName, database.Spec.HostName).
+		WithUsername(database.Spec.RootUsername).
+		WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+		WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
 
-	return r.updateAndReturn(&ctx, &mongodb, &log)
+	return r.updateAndReturn(&ctx, &database, &log)
 }
 
-func (r *MongoDBReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.MongoDB{}).
+		For(&infrav1beta1.MongoDBDatabase{}).
 		Complete(r)
 }
 
-func (r *MongoDBReconciler) updateAndReturn(ctx *context.Context, mongodb *infrav1beta1.MongoDB, log *logr.Logger) (ctrl.Result, error) {
-	mongodb.Status.LastUpdateTime = metav1.Now()
-	if err := r.Status().Update(*ctx, mongodb); err != nil {
-		(*log).Error(err, "unable to update MongoDB status")
+func (r *MongoDBDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.MongoDBDatabase, log *logr.Logger) (ctrl.Result, error) {
+	database.Status.LastUpdateTime = metav1.Now()
+	if err := r.Status().Update(*ctx, database); err != nil {
+		(*log).Error(err, "unable to update MongoDBDatabase status")
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil

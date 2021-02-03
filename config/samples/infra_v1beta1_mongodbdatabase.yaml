@@ -1,7 +1,7 @@
 apiVersion: infra.doodle.com/v1beta1
-kind: MongoDB
+kind: MongoDBDatabase
 metadata:
-  name: mongodb-sample
+  name: mongodbdatabase-sample
   namespace: devops
 spec:
   databaseName: "mongodb_sample"

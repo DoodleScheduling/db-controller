@@ -85,22 +85,22 @@ func main() {
 	// General setup
 	vaultCache := vault.NewCache()
 
-	// MongoDB setup
+	// MongoDBDatabase setup
 	mongoDBServerCache := mongodbAPI.NewCache()
-	if err = (&controllers.MongoDBReconciler{
+	if err = (&controllers.MongoDBDatabaseReconciler{
 		Client:      mgr.GetClient(),
-		Log:         ctrl.Log.WithName("controllers").WithName("MongoDB"),
+		Log:         ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
 		Scheme:      mgr.GetScheme(),
 		ServerCache: mongoDBServerCache,
 		VaultCache:  vaultCache,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MongoDB")
+		setupLog.Error(err, "unable to create controller", "controller", "MongoDBDatabase")
 		os.Exit(1)
 	}
 
 	// PostgreSQLDatabase setup
 	postgreSQLServerCache := postgresqlAPI.NewCache()
-	if err = (&controllers.PostgreSQLReconciler{
+	if err = (&controllers.PostgreSQLDatabaseReconciler{
 		Client:      mgr.GetClient(),
 		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
 		Scheme:      mgr.GetScheme(),

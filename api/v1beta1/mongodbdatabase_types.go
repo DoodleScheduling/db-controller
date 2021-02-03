@@ -27,34 +27,34 @@ const (
 	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
 )
 
-type MongoDBRootSecretLookup struct {
+type MongoDBDatabaseRootSecretLookup struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 	Field     string `json:"field"`
 }
 
-type MongoDBCredentials []MongoDBCredential
-type MongoDBCredential struct {
+type MongoDBDatabaseCredentials []MongoDBDatabaseCredential
+type MongoDBDatabaseCredential struct {
 	UserName string `json:"username"`
 	Vault    Vault  `json:"vault"`
 }
 
-// MongoDBSpec defines the desired state of MongoDB
+// MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type MongoDBSpec struct {
+type MongoDBDatabaseSpec struct {
 	DatabaseName string `json:"databaseName"`
 	HostName     string `json:"hostName"`
 	// +optional
 	RootUsername string `json:"rootUsername"`
 	// +optional
-	RootAuthenticationDatabase string                  `json:"rootAuthDatabase"`
-	RootSecretLookup           MongoDBRootSecretLookup `json:"rootSecretLookup"`
-	Credentials                MongoDBCredentials      `json:"credentials"`
+	RootAuthenticationDatabase string                          `json:"rootAuthDatabase"`
+	RootSecretLookup           MongoDBDatabaseRootSecretLookup `json:"rootSecretLookup"`
+	Credentials                MongoDBDatabaseCredentials      `json:"credentials"`
 }
 
-// MongoDBStatus defines the observed state of MongoDB
+// MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type MongoDBStatus struct {
+type MongoDBDatabaseStatus struct {
 	DatabaseStatus    DatabaseStatus    `json:"database"`
 	CredentialsStatus CredentialsStatus `json:"credentials"`
 	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
@@ -63,36 +63,36 @@ type MongoDBStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// MongoDB is the Schema for the mongodbs API
-type MongoDB struct {
+// MongoDBDatabase is the Schema for the mongodbs API
+type MongoDBDatabase struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MongoDBSpec   `json:"spec,omitempty"`
-	Status MongoDBStatus `json:"status,omitempty"`
+	Spec   MongoDBDatabaseSpec   `json:"spec,omitempty"`
+	Status MongoDBDatabaseStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// MongoDBList contains a list of MongoDB
-type MongoDBList struct {
+// MongoDBDatabaseList contains a list of MongoDBDatabase
+type MongoDBDatabaseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MongoDB `json:"items"`
+	Items           []MongoDBDatabase `json:"items"`
 }
 
 /*
 	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
 	Returns removed statuses.
 */
-func (mongodb *MongoDB) RemoveUnneededCredentialsStatus() *CredentialsStatus {
+func (d *MongoDBDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatus {
 	removedStatuses := make(CredentialsStatus, 0)
-	statuses := &mongodb.Status.CredentialsStatus
+	statuses := &d.Status.CredentialsStatus
 	for i := 0; i < len(*statuses); i++ {
 		status := (*statuses)[i]
 		found := false
 		if status != nil {
-			for _, credential := range mongodb.Spec.Credentials {
+			for _, credential := range d.Spec.Credentials {
 				if credential.UserName == status.Username {
 					found = true
 				}
@@ -105,32 +105,32 @@ func (mongodb *MongoDB) RemoveUnneededCredentialsStatus() *CredentialsStatus {
 			i--
 		}
 	}
-	mongodb.Status.CredentialsStatus = *statuses
+	d.Status.CredentialsStatus = *statuses
 	return &removedStatuses
 }
 
-func (this *MongoDB) SetDefaults() error {
-	if this.Spec.RootUsername == "" {
-		this.Spec.RootUsername = DEFAULT_MONGODB_ROOT_USER
+func (d *MongoDBDatabase) SetDefaults() error {
+	if d.Spec.RootUsername == "" {
+		d.Spec.RootUsername = DEFAULT_MONGODB_ROOT_USER
 	}
-	if this.Spec.RootAuthenticationDatabase == "" {
-		this.Spec.RootAuthenticationDatabase = DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE
+	if d.Spec.RootAuthenticationDatabase == "" {
+		d.Spec.RootAuthenticationDatabase = DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE
 	}
-	if this.Spec.RootSecretLookup.Name == "" {
+	if d.Spec.RootSecretLookup.Name == "" {
 		return errors.New("must specify root secret")
 	}
-	if this.Spec.RootSecretLookup.Field == "" {
+	if d.Spec.RootSecretLookup.Field == "" {
 		return errors.New("must specify root secret field")
 	}
-	if this.Spec.RootSecretLookup.Namespace == "" {
-		this.Spec.RootSecretLookup.Namespace = this.ObjectMeta.Namespace
+	if d.Spec.RootSecretLookup.Namespace == "" {
+		d.Spec.RootSecretLookup.Namespace = d.ObjectMeta.Namespace
 	}
-	if this.Status.CredentialsStatus == nil || len(this.Status.CredentialsStatus) == 0 {
-		this.Status.CredentialsStatus = make([]*CredentialStatus, 0)
+	if d.Status.CredentialsStatus == nil || len(d.Status.CredentialsStatus) == 0 {
+		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
 	}
 	return nil
 }
 
 func init() {
-	SchemeBuilder.Register(&MongoDB{}, &MongoDBList{})
+	SchemeBuilder.Register(&MongoDBDatabase{}, &MongoDBDatabaseList{})
 }

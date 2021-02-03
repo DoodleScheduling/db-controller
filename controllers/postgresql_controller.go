@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// PostgreSQLReconciler reconciles a PostgreSQLDatabase object
-type PostgreSQLReconciler struct {
+// PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
+type PostgreSQLDatabaseReconciler struct {
 	client.Client
 	Log         logr.Logger
 	Scheme      *runtime.Scheme
@@ -42,7 +42,7 @@ type PostgreSQLReconciler struct {
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("postgresqldatabase", req.NamespacedName)
 
@@ -144,13 +144,13 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	return r.updateAndReturn(&ctx, &database, &log)
 }
 
-func (r *PostgreSQLReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.PostgreSQLDatabase{}).
 		Complete(r)
 }
 
-func (r *PostgreSQLReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {
+func (r *PostgreSQLDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {
 	database.Status.LastUpdateTime = metav1.Now()
 	if err := r.Status().Update(*ctx, database); err != nil {
 		(*log).Error(err, "unable to update PostgreSQLDatabase status")

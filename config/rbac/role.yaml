@@ -17,7 +17,7 @@ rules:
 - apiGroups:
   - infra.doodle.com
   resources:
-  - mongodbs
+  - mongodbdatabases
   verbs:
   - create
   - delete
@@ -29,7 +29,7 @@ rules:
 - apiGroups:
   - infra.doodle.com
   resources:
-  - mongodbs/status
+  - mongodbdatabases/status
   verbs:
   - get
   - patch

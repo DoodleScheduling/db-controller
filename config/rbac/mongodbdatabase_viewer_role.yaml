@@ -1,24 +1,20 @@
-# permissions for end users to edit mongodbs.
+# permissions for end users to view mongodbs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: mongodb-editor-role
+  name: mongodbdatabase-viewer-role
 rules:
 - apiGroups:
   - infra.doodle.com
   resources:
-  - mongodbs
+  - mongodbdatabases
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - infra.doodle.com
   resources:
-  - mongodbs/status
+  - mongodbdatabases/status
   verbs:
   - get
