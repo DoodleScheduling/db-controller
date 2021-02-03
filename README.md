@@ -18,7 +18,7 @@ Argument | Default value | Example | Purpose |
 --metrics-addr | :8080 | :8080 | Metrics port |
 --enable-leader-election | false | true | Enable leader election |
 --namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
---max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles. This config covers all controllers. TODO maybe have a separate flag for each controller? |
+--max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. TODO maybe have a separate flag for each controller? |
 
 
 
