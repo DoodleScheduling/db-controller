@@ -1,7 +1,7 @@
 apiVersion: infra.doodle.com/v1beta1
-kind: PostgreSQL
+kind: PostgreSQLDatabase
 metadata:
-  name: postgresql-sample
+  name: postgresqldatabase-sample
   namespace: devops
 spec:
   databaseName: "postgres_sample"

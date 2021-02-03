@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// PostgreSQLReconciler reconciles a PostgreSQL object
+// PostgreSQLReconciler reconciles a PostgreSQLDatabase object
 type PostgreSQLReconciler struct {
 	client.Client
 	Log         logr.Logger
@@ -38,22 +38,22 @@ type PostgreSQLReconciler struct {
 	VaultCache  *vaultAPI.Cache
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqls,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqls/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("postgresql", req.NamespacedName)
+	log := r.Log.WithValues("postgresqldatabase", req.NamespacedName)
 
 	// common controller functions
 	cw := NewControllerWrapper(*r, &ctx)
 	// garbage collector
 	gc := NewPostgreSQLGarbageCollector(r, cw, &log)
 
-	// get postgresql resource by namespaced name
-	var postgresql infrav1beta1.PostgreSQL
-	if err := r.Get(ctx, req.NamespacedName, &postgresql); err != nil {
+	// get database resource by namespaced name
+	var database infrav1beta1.PostgreSQLDatabase
+	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
 		if apierrors.IsNotFound(err) {
 			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
 			// How to do it, though? Resource doesn't exist anymore, so we need to list all databases and all manifests and compare?
@@ -63,66 +63,66 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 
 	// set spec defaults. Does not mutate the spec, since we are not updating resource
-	if err := postgresql.SetDefaults(); err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &postgresql, &log)
+	if err := database.SetDefaults(); err != nil {
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	if err := gc.Clean(&postgresql); err != nil {
+	if err := gc.Clean(&database); err != nil {
 		log.Info("Error while cleaning garbage", "error", err)
 	}
 
 	// get root database password from k8s secret
-	rootPassword, err := cw.GetRootPassword(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
+	rootPassword, err := cw.GetRootPassword(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &postgresql, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
-	// postgresql connection to spec host, cached
-	postgreSQLServer, err := r.ServerCache.Get(postgresql.Spec.HostName, postgresql.Spec.RootUsername, rootPassword, postgresql.Spec.RootAuthenticationDatabase)
+	// database connection to spec host, cached
+	postgreSQLServer, err := r.ServerCache.Get(database.Spec.HostName, database.Spec.RootUsername, rootPassword, database.Spec.RootAuthenticationDatabase)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName).
-			WithUsername(postgresql.Spec.RootUsername).
-			WithAuthDatabase(postgresql.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
-		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &postgresql, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
+			WithUsername(database.Spec.RootUsername).
+			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// vault connection, cached
-	vault, err := r.VaultCache.Get(postgresql.Spec.RootSecretLookup.Name)
+	vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
 	if err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName).
-			WithUsername(postgresql.Spec.RootUsername).
-			WithAuthDatabase(postgresql.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
-		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &postgresql, &log)
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
+			WithUsername(database.Spec.RootUsername).
+			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
 
 	// Setup database
-	if err := postgreSQLServer.CreateDatabaseIfNotExists(postgresql.Spec.DatabaseName); err != nil {
-		postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", postgresql.Spec.HostName).
-			WithUsername(postgresql.Spec.RootUsername).
-			WithAuthDatabase(postgresql.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
-		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		r.ServerCache.Remove(postgresql.Spec.HostName)
-		return r.updateAndReturn(&ctx, &postgresql, &log)
+	if err := postgreSQLServer.CreateDatabaseIfNotExists(database.Spec.DatabaseName); err != nil {
+		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
+			WithUsername(database.Spec.RootUsername).
+			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
+		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		r.ServerCache.Remove(database.Spec.HostName)
+		return r.updateAndReturn(&ctx, &database, &log)
 	}
-	postgresql.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", postgresql.Spec.DatabaseName, postgresql.Spec.HostName).
-		WithUsername(postgresql.Spec.RootUsername).
-		WithAuthDatabase(postgresql.Spec.RootAuthenticationDatabase).
-		WithRootSecretLookup(postgresql.Spec.RootSecretLookup.Name, postgresql.Spec.RootSecretLookup.Namespace, postgresql.Spec.RootSecretLookup.Field)
+	database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", database.Spec.DatabaseName, database.Spec.HostName).
+		WithUsername(database.Spec.RootUsername).
+		WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
+		WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
 
 	// setup credentials as per spec
-	for _, credential := range postgresql.Spec.Credentials {
+	for _, credential := range database.Spec.Credentials {
 		username := credential.UserName
-		postgreSQLCredentialStatus := postgresql.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
+		postgreSQLCredentialStatus := database.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
 			return status != nil && status.Username == username
 		})
 		// get user credentials from vault
@@ -134,26 +134,26 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		password := vaultResponse.Secret
 
 		// setup user credentials and privileges
-		if err := postgreSQLServer.SetupUser(postgresql.Spec.DatabaseName, username, password); err != nil {
+		if err := postgreSQLServer.SetupUser(database.Spec.DatabaseName, username, password); err != nil {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 		} else {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
 		}
 	}
 
-	return r.updateAndReturn(&ctx, &postgresql, &log)
+	return r.updateAndReturn(&ctx, &database, &log)
 }
 
 func (r *PostgreSQLReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.PostgreSQL{}).
+		For(&infrav1beta1.PostgreSQLDatabase{}).
 		Complete(r)
 }
 
-func (r *PostgreSQLReconciler) updateAndReturn(ctx *context.Context, postgresql *infrav1beta1.PostgreSQL, log *logr.Logger) (ctrl.Result, error) {
-	postgresql.Status.LastUpdateTime = metav1.Now()
-	if err := r.Status().Update(*ctx, postgresql); err != nil {
-		(*log).Error(err, "unable to update PostgreSQL status")
+func (r *PostgreSQLReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {
+	database.Status.LastUpdateTime = metav1.Now()
+	if err := r.Status().Update(*ctx, database); err != nil {
+		(*log).Error(err, "unable to update PostgreSQLDatabase status")
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil

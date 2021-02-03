@@ -27,34 +27,34 @@ const (
 	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
 )
 
-type PostgreSQLRootSecretLookup struct {
+type PostgreSQLDatabaseRootSecretLookup struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 	Field     string `json:"field"`
 }
 
-type PostgreSQLCredentials []PostgreSQLCredential
-type PostgreSQLCredential struct {
+type PostgreSQLDatabaseCredentials []PostgreSQLDatabaseCredential
+type PostgreSQLDatabaseCredential struct {
 	UserName string `json:"username"`
 	Vault    Vault  `json:"vault"`
 }
 
-// PostgreSQLSpec defines the desired state of PostgreSQL
+// PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type PostgreSQLSpec struct {
+type PostgreSQLDatabaseSpec struct {
 	DatabaseName string `json:"databaseName"`
 	HostName     string `json:"hostName"`
 	// +optional
 	RootUsername string `json:"rootUsername"`
 	// +optional
-	RootAuthenticationDatabase string                     `json:"rootAuthDatabase"`
-	RootSecretLookup           PostgreSQLRootSecretLookup `json:"rootSecretLookup"`
-	Credentials                PostgreSQLCredentials      `json:"credentials"`
+	RootAuthenticationDatabase string                             `json:"rootAuthDatabase"`
+	RootSecretLookup           PostgreSQLDatabaseRootSecretLookup `json:"rootSecretLookup"`
+	Credentials                PostgreSQLDatabaseCredentials      `json:"credentials"`
 }
 
-// PostgreSQLStatus defines the observed state of PostgreSQL
+// PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type PostgreSQLStatus struct {
+type PostgreSQLDatabaseStatus struct {
 	DatabaseStatus    DatabaseStatus    `json:"database"`
 	CredentialsStatus CredentialsStatus `json:"credentials"`
 	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
@@ -63,36 +63,36 @@ type PostgreSQLStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// PostgreSQL is the Schema for the postgresqls API
-type PostgreSQL struct {
+// PostgreSQLDatabase is the Schema for the postgresqls API
+type PostgreSQLDatabase struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PostgreSQLSpec   `json:"spec,omitempty"`
-	Status PostgreSQLStatus `json:"status,omitempty"`
+	Spec   PostgreSQLDatabaseSpec   `json:"spec,omitempty"`
+	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// PostgreSQLList contains a list of PostgreSQL
-type PostgreSQLList struct {
+// PostgreSQLDatabaseList contains a list of PostgreSQLDatabase
+type PostgreSQLDatabaseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PostgreSQL `json:"items"`
+	Items           []PostgreSQLDatabase `json:"items"`
 }
 
 /*
 	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
 	Returns removed statuses.
 */
-func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *CredentialsStatus {
+func (d *PostgreSQLDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatus {
 	removedStatuses := make(CredentialsStatus, 0)
-	statuses := &postgresql.Status.CredentialsStatus
+	statuses := &d.Status.CredentialsStatus
 	for i := 0; i < len(*statuses); i++ {
 		status := (*statuses)[i]
 		found := false
 		if status != nil {
-			for _, credential := range postgresql.Spec.Credentials {
+			for _, credential := range d.Spec.Credentials {
 				if credential.UserName == status.Username {
 					found = true
 				}
@@ -105,32 +105,32 @@ func (postgresql *PostgreSQL) RemoveUnneededCredentialsStatus() *CredentialsStat
 			i--
 		}
 	}
-	postgresql.Status.CredentialsStatus = *statuses
+	d.Status.CredentialsStatus = *statuses
 	return &removedStatuses
 }
 
-func (this *PostgreSQL) SetDefaults() error {
-	if this.Spec.RootUsername == "" {
-		this.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
+func (d *PostgreSQLDatabase) SetDefaults() error {
+	if d.Spec.RootUsername == "" {
+		d.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
 	}
-	if this.Spec.RootAuthenticationDatabase == "" {
-		this.Spec.RootAuthenticationDatabase = DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE
+	if d.Spec.RootAuthenticationDatabase == "" {
+		d.Spec.RootAuthenticationDatabase = DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE
 	}
-	if this.Spec.RootSecretLookup.Name == "" {
+	if d.Spec.RootSecretLookup.Name == "" {
 		return errors.New("must specify root secret")
 	}
-	if this.Spec.RootSecretLookup.Field == "" {
+	if d.Spec.RootSecretLookup.Field == "" {
 		return errors.New("must specify root secret field")
 	}
-	if this.Spec.RootSecretLookup.Namespace == "" {
-		this.Spec.RootSecretLookup.Namespace = this.ObjectMeta.Namespace
+	if d.Spec.RootSecretLookup.Namespace == "" {
+		d.Spec.RootSecretLookup.Namespace = d.ObjectMeta.Namespace
 	}
-	if this.Status.CredentialsStatus == nil || len(this.Status.CredentialsStatus) == 0 {
-		this.Status.CredentialsStatus = make([]*CredentialStatus, 0)
+	if d.Status.CredentialsStatus == nil || len(d.Status.CredentialsStatus) == 0 {
+		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
 	}
 	return nil
 }
 
 func init() {
-	SchemeBuilder.Register(&PostgreSQL{}, &PostgreSQLList{})
+	SchemeBuilder.Register(&PostgreSQLDatabase{}, &PostgreSQLDatabaseList{})
 }

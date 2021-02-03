@@ -98,16 +98,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// PostgreSQL setup
+	// PostgreSQLDatabase setup
 	postgreSQLServerCache := postgresqlAPI.NewCache()
 	if err = (&controllers.PostgreSQLReconciler{
 		Client:      mgr.GetClient(),
-		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQL"),
+		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
 		Scheme:      mgr.GetScheme(),
 		ServerCache: postgreSQLServerCache,
 		VaultCache:  vaultCache,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQL")
+		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLDatabase")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
