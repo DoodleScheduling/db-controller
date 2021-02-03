@@ -63,21 +63,21 @@ func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
 	}
 }
 
-func (s *PostgreSQLServer) SetupUser(user string, password string, database string) error {
+func (s *PostgreSQLServer) SetupUser(database string, user string, password string) error {
 	if err := s.createUserIfNotExists(user); err != nil {
 		return err
 	}
 	if err := s.setPasswordForUser(user, password); err != nil {
 		return err
 	}
-	if err := s.grantAllPrivileges(user, database); err != nil {
+	if err := s.grantAllPrivileges(database, user); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *PostgreSQLServer) DropUser(user string, database string) error {
-	if err := s.revokeAllPrivileges(user, database); err != nil {
+func (s *PostgreSQLServer) DropUser(database string, user string) error {
+	if err := s.revokeAllPrivileges(database, user); err != nil {
 		return err
 	}
 	if err := s.dropUserIfNotExist(user); err != nil {
@@ -139,14 +139,14 @@ func (s *PostgreSQLServer) setPasswordForUser(user string, password string) erro
 	return nil
 }
 
-func (s *PostgreSQLServer) grantAllPrivileges(user string, database string) error {
+func (s *PostgreSQLServer) grantAllPrivileges(database string, user string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *PostgreSQLServer) revokeAllPrivileges(user string, database string) error {
+func (s *PostgreSQLServer) revokeAllPrivileges(database string, user string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\";", database, user)); err != nil {
 		return err
 	}

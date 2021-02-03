@@ -23,8 +23,8 @@ import (
 
 // defaults
 const (
-	DEFAULT_POSTGRESQL_ROOT_USER         = "postgres"
-	DEFAULT_ROOT_AUTHENTICATION_DATABASE = "postgres"
+	DEFAULT_POSTGRESQL_ROOT_USER                    = "postgres"
+	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
 )
 
 type PostgreSQLRootSecretLookup struct {
@@ -114,7 +114,7 @@ func (this *PostgreSQL) SetDefaults() error {
 		this.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
 	}
 	if this.Spec.RootAuthenticationDatabase == "" {
-		this.Spec.RootAuthenticationDatabase = DEFAULT_ROOT_AUTHENTICATION_DATABASE
+		this.Spec.RootAuthenticationDatabase = DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE
 	}
 	if this.Spec.RootSecretLookup.Name == "" {
 		return errors.New("must specify root secret")

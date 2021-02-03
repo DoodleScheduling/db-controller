@@ -92,6 +92,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		postgresql.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &postgresql, &log)
 	}
+
 	// vault connection, cached
 	vault, err := r.VaultCache.Get(postgresql.Spec.RootSecretLookup.Name)
 	if err != nil {
@@ -133,7 +134,7 @@ func (r *PostgreSQLReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		password := vaultResponse.Secret
 
 		// setup user credentials and privileges
-		if err := postgreSQLServer.SetupUser(username, password, postgresql.Spec.DatabaseName); err != nil {
+		if err := postgreSQLServer.SetupUser(postgresql.Spec.DatabaseName, username, password); err != nil {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 		} else {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")

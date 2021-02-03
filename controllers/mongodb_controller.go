@@ -18,18 +18,15 @@ package controllers
 
 import (
 	"context"
+	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
+	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
-	"github.com/pkg/errors"
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 )
 
 // MongoDBReconciler reconciles a MongoDB object
@@ -43,6 +40,7 @@ type MongoDBReconciler struct {
 
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -50,19 +48,33 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// common controller functions
 	cw := NewControllerWrapper(*r, &ctx)
+	// garbage collector
+	gc := NewMongoDBGarbageCollector(r, cw, &log)
 
+	// get mongodb resource by namespaced name
 	var mongodb infrav1beta1.MongoDB
 	if err := r.Get(ctx, req.NamespacedName, &mongodb); err != nil {
 		if apierrors.IsNotFound(err) {
+			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
+			// How to do it, though? Resource doesn't exist anymore, so we need to list all databases and all manifests and compare?
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, errors.Wrap(err, "unable to fetch Mongodb")
+		return ctrl.Result{}, err
 	}
 
-	s := make(infrav1beta1.CredentialsStatus, 0)
-	mongodb.Status.CredentialsStatus = s
+	// set spec defaults. Does not mutate the spec, since we are not updating resource
+	if err := mongodb.SetDefaults(); err != nil {
+		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
+		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
+		return r.updateAndReturn(&ctx, &mongodb, &log)
+	}
 
-	// root password
+	// Garbage Collection. If errors occur, log and proceed with reconciliation.
+	if err := gc.Clean(&mongodb); err != nil {
+		log.Info("Error while cleaning garbage", "error", err)
+	}
+
+	// get root database password from k8s secret
 	rootPassword, err := cw.GetRootPassword(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
 	if err != nil {
 		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
@@ -70,23 +82,29 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
 
-	// mongoDB server
+	// mongoDB connection to spec host, cached
 	mongoDBServer, err := r.ServerCache.Get(mongodb.Spec.HostName, mongodb.Spec.RootUsername, rootPassword, mongodb.Spec.RootAuthenticationDatabase)
 	if err != nil {
-		log.Error(err, "Error while connecting to mongodb")
-		mongodb.Status.DatabaseStatus.Status = infrav1beta1.Unavailable
-		mongodb.Status.DatabaseStatus.Message = err.Error()
+		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName).
+			WithUsername(mongodb.Spec.RootUsername).
+			WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
+		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
 
 	// vault connection, cached
 	vault, err := r.VaultCache.Get(mongodb.Spec.RootSecretLookup.Name)
 	if err != nil {
-		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName)
+		mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", mongodb.Spec.HostName).
+			WithUsername(mongodb.Spec.RootUsername).
+			WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
+			WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
 		mongodb.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
 		return r.updateAndReturn(&ctx, &mongodb, &log)
 	}
 
+	// setup credentials as per spec
 	for _, credential := range mongodb.Spec.Credentials {
 		username := credential.UserName
 		mongodbCredentialStatus := mongodb.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
@@ -105,8 +123,12 @@ func (r *MongoDBReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
 		}
 	}
-	mongodb.Status.DatabaseStatus.Status = infrav1beta1.Available
-	mongodb.Status.DatabaseStatus.Message = "Database up."
+
+	// setup database status - database is automatically set up with credentials
+	mongodb.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", mongodb.Spec.DatabaseName, mongodb.Spec.HostName).
+		WithUsername(mongodb.Spec.RootUsername).
+		WithAuthDatabase(mongodb.Spec.RootAuthenticationDatabase).
+		WithRootSecretLookup(mongodb.Spec.RootSecretLookup.Name, mongodb.Spec.RootSecretLookup.Namespace, mongodb.Spec.RootSecretLookup.Field)
 
 	return r.updateAndReturn(&ctx, &mongodb, &log)
 }

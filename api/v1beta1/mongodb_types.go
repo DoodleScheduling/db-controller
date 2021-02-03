@@ -17,7 +17,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	"errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// defaults
+const (
+	DEFAULT_MONGODB_ROOT_USER                    = "root"
+	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
 )
 
 type MongoDBRootSecretLookup struct {
@@ -72,6 +79,56 @@ type MongoDBList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []MongoDB `json:"items"`
+}
+
+/*
+	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
+	Returns removed statuses.
+*/
+func (mongodb *MongoDB) RemoveUnneededCredentialsStatus() *CredentialsStatus {
+	removedStatuses := make(CredentialsStatus, 0)
+	statuses := &mongodb.Status.CredentialsStatus
+	for i := 0; i < len(*statuses); i++ {
+		status := (*statuses)[i]
+		found := false
+		if status != nil {
+			for _, credential := range mongodb.Spec.Credentials {
+				if credential.UserName == status.Username {
+					found = true
+				}
+			}
+		}
+		if !found {
+			removedStatuses = append(removedStatuses, status)
+			s := append((*statuses)[:i], (*statuses)[i+1:]...)
+			statuses = &s
+			i--
+		}
+	}
+	mongodb.Status.CredentialsStatus = *statuses
+	return &removedStatuses
+}
+
+func (this *MongoDB) SetDefaults() error {
+	if this.Spec.RootUsername == "" {
+		this.Spec.RootUsername = DEFAULT_MONGODB_ROOT_USER
+	}
+	if this.Spec.RootAuthenticationDatabase == "" {
+		this.Spec.RootAuthenticationDatabase = DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE
+	}
+	if this.Spec.RootSecretLookup.Name == "" {
+		return errors.New("must specify root secret")
+	}
+	if this.Spec.RootSecretLookup.Field == "" {
+		return errors.New("must specify root secret field")
+	}
+	if this.Spec.RootSecretLookup.Namespace == "" {
+		this.Spec.RootSecretLookup.Namespace = this.ObjectMeta.Namespace
+	}
+	if this.Status.CredentialsStatus == nil || len(this.Status.CredentialsStatus) == 0 {
+		this.Status.CredentialsStatus = make([]*CredentialStatus, 0)
+	}
+	return nil
 }
 
 func init() {

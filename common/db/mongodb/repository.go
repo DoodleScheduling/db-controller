@@ -132,6 +132,15 @@ func (m *MongoDBServer) updateUserPasswordAndRoles(database string, username str
 	return nil
 }
 
+func (m *MongoDBServer) DropUser(database string, username string) error {
+	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
+	r := m.runCommand(database, command)
+	if _, err := r.DecodeBytes(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *MongoDBServer) runCommand(database string, command *bson.D) *mongo.SingleResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
