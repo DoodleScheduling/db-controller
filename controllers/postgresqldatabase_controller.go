@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
@@ -144,10 +145,12 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	return r.updateAndReturn(&ctx, &database, &log)
 }
 
-func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.PostgreSQLDatabase{}).
-		Complete(r)
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		}).Complete(r)
 }
 
 func (r *PostgreSQLDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {

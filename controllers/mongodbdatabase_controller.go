@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 // MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
@@ -133,10 +134,12 @@ func (r *MongoDBDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	return r.updateAndReturn(&ctx, &database, &log)
 }
 
-func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.MongoDBDatabase{}).
-		Complete(r)
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		}).Complete(r)
 }
 
 func (r *MongoDBDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.MongoDBDatabase, log *logr.Logger) (ctrl.Result, error) {
