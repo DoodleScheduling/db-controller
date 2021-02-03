@@ -17,6 +17,7 @@ ENV Variable | Argument | Default value | Example | Purpose |
 -------------|----------|---------------|---------|---------|
 METRICS_ADDR | --metrics-addr | :8080 | :8080 | Metrics port |
 ENABLE_LEADER_ELECTION | --enable-leader-election | false | true | Enable leader election |
+LEADER_ELECTION_NAMESPACE | --leader-election-namespace | "" | devops | Leader election namespace. Default is the same as controller.
 NAMESPACES | --namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
 MAX_CONCURRENT_RECONCILES | --max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. TODO maybe have a separate flag for each controller? |
 
