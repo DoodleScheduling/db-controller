@@ -8,7 +8,8 @@ require (
 	github.com/jackc/pgx/v4 v4.10.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
-	github.com/pkg/errors v0.9.1
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.3.2
 	github.com/xdg/stringprep v1.0.0 // indirect
 	go.mongodb.org/mongo-driver v1.4.4
 	k8s.io/api v0.17.2

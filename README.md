@@ -13,12 +13,12 @@ TODO: Write proper README file.
 
 Config options:
 
-Argument | Default value | Example | Purpose |
----------|---------------|---------|---------|
---metrics-addr | :8080 | :8080 | Metrics port |
---enable-leader-election | false | true | Enable leader election |
---namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
---max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. TODO maybe have a separate flag for each controller? |
+ENV Variable | Argument | Default value | Example | Purpose |
+-------------|----------|---------------|---------|---------|
+METRICS_ADDR | --metrics-addr | :8080 | :8080 | Metrics port |
+ENABLE_LEADER_ELECTION | --enable-leader-election | false | true | Enable leader election |
+NAMESPACES | --namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
+MAX_CONCURRENT_RECONCILES | --max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. TODO maybe have a separate flag for each controller? |
 
 
 

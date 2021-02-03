@@ -20,6 +20,9 @@ import (
 	"flag"
 	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 	"github.com/doodlescheduling/kubedb/common/vault"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -42,6 +45,24 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+// flags
+const (
+	MetricAddr              = "metrics-addr"
+	EnableLeaderElection    = "enable-leader-election"
+	LeaderElectionNamespace = "leader-election-namespace"
+	Namespaces              = "namespaces"
+	MaxConcurrentReconciles = "max-concurrent-reconciles"
+)
+
+// config variables & defaults
+var (
+	metricsAddr             = ":8080"
+	enableLeaderElection    = false
+	leaderElectionNamespace = ""
+	namespacesConfig        = ""
+	maxConcurrentReconciles = 1
+)
+
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
@@ -50,19 +71,32 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var namespacesConfig string
-	var maxConcurrentReconciles int
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	flag.StringVar(&metricsAddr, MetricAddr, ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, EnableLeaderElection, false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&namespacesConfig, "namespaces", "", "Comma-separated list of namespaces to watch. If not set, all namespaces will be watched.")
-	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles. Default is 1.")
-	flag.Parse()
+	flag.StringVar(&leaderElectionNamespace, LeaderElectionNamespace, "", "Leader election namespace. Default is the same namespace as controller.")
+	flag.StringVar(&namespacesConfig, Namespaces, "", "Comma-separated list of namespaces to watch. If not set, all namespaces will be watched.")
+	flag.IntVar(&maxConcurrentReconciles, MaxConcurrentReconciles, 1, "Maximum number of concurrent reconciles. Default is 1.")
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		setupLog.Error(err, "Failed parsing command line arguments")
+		os.Exit(1)
+	}
+	replacer := strings.NewReplacer("-", "_")
+	viper.SetEnvKeyReplacer(replacer)
+	viper.AutomaticEnv()
+
+	metricsAddr = viper.GetString(MetricAddr)
+	enableLeaderElection = viper.GetBool(EnableLeaderElection)
+	leaderElectionNamespace = viper.GetString(LeaderElectionNamespace)
+	namespacesConfig = viper.GetString(Namespaces)
+	maxConcurrentReconciles = viper.GetInt(MaxConcurrentReconciles)
 
 	namespaces := strings.Split(namespacesConfig, ",")
 	options := ctrl.Options{
@@ -77,6 +111,9 @@ func main() {
 		setupLog.Info("watching configured namespaces", "namespaces", namespaces)
 	} else {
 		setupLog.Info("watching all namespaces")
+	}
+	if leaderElectionNamespace != "" {
+		options.LeaderElectionNamespace = leaderElectionNamespace
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
