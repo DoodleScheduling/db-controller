@@ -62,7 +62,6 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
 		if apierrors.IsNotFound(err) {
 			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
-			// How to do it, though? Resource doesn't exist anymore, so we need to list all databases and all manifests and compare?
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
