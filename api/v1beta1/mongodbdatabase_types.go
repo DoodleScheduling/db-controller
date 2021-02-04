@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"errors"
+	"github.com/doodlescheduling/kubedb/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,6 +26,11 @@ import (
 const (
 	DEFAULT_MONGODB_ROOT_USER                    = "root"
 	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
+)
+
+// Finalizer
+const (
+	MongoSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
 )
 
 type MongoDBDatabaseRootSecretLookup struct {
@@ -57,7 +63,7 @@ type MongoDBDatabaseSpec struct {
 type MongoDBDatabaseStatus struct {
 	DatabaseStatus    DatabaseStatus    `json:"database"`
 	CredentialsStatus CredentialsStatus `json:"credentials"`
-	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
+	LastUpdateTime    *metav1.Time      `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true
@@ -107,6 +113,38 @@ func (d *MongoDBDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatus {
 	}
 	d.Status.CredentialsStatus = *statuses
 	return &removedStatuses
+}
+
+/*
+	If object doesn't contain finalizer, set it and call update function 'updateF'.
+	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
+*/
+func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
+	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
+		return nil
+	}
+	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer) {
+		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer)
+		return updateF()
+	}
+	return nil
+}
+
+/*
+	Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
+	Call finalize function 'finalizeF', which should handle finalization logic.
+	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
+*/
+func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
+	if d.ObjectMeta.DeletionTimestamp.IsZero() {
+		return false, nil
+	}
+	if stringutils.ContainsString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer) {
+		_ = finalizeF()
+		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer)
+		return true, updateF()
+	}
+	return true, nil
 }
 
 func (d *MongoDBDatabase) SetDefaults() error {

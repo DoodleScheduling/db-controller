@@ -28,6 +28,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+const (
+	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
 )
 
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
@@ -63,6 +68,24 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, err
 	}
 
+	// set finalizer
+	if err := database.SetFinalizer(func() error {
+		return r.Update(ctx, &database)
+	}); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// finalize
+	if finalized, err := database.Finalize(func() error {
+		return r.Update(ctx, &database)
+	}, func() error {
+		return gc.CleanFromSpec(&database)
+	}); err != nil {
+		return reconcile.Result{}, err
+	} else if finalized {
+		return reconcile.Result{}, nil
+	}
+
 	// set spec defaults. Does not mutate the spec, since we are not updating resource
 	if err := database.SetDefaults(); err != nil {
 		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
@@ -71,7 +94,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	}
 
 	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	if err := gc.Clean(&database); err != nil {
+	if err := gc.CleanFromStatus(&database); err != nil {
 		log.Info("Error while cleaning garbage", "error", err)
 	}
 
@@ -154,8 +177,14 @@ func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxCon
 }
 
 func (r *PostgreSQLDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {
-	database.Status.LastUpdateTime = metav1.Now()
+	now := metav1.Now()
+	database.Status.LastUpdateTime = &now
 	if err := r.Status().Update(*ctx, database); err != nil {
+		if apierrors.IsConflict(err) {
+			return ctrl.Result{
+				Requeue: true,
+			}, nil
+		}
 		(*log).Error(err, "unable to update PostgreSQLDatabase status")
 		return ctrl.Result{}, err
 	}

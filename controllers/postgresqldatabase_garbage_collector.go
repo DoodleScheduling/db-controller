@@ -23,7 +23,11 @@ func NewPostgreSQLGarbageCollector(r *PostgreSQLDatabaseReconciler, cw *Controll
 /*	For now, Garbage Collector does not drop databases, because we haven't decided if we want to delete all data.
 	Possible avenue to proceed is to have a separate option flag/struct (to be set in Spec), that will force deletion of all garbage, including data.
 */
-func (g *PostgreSQLGarbageCollector) Clean(database *infrav1beta1.PostgreSQLDatabase) error {
+func (g *PostgreSQLGarbageCollector) CleanFromStatus(database *infrav1beta1.PostgreSQLDatabase) error {
+	// first time, nothing to clear
+	if database.Status.LastUpdateTime == nil {
+		return nil
+	}
 	rootPassword, err := g.cw.GetRootPassword(database.Status.DatabaseStatus.RootSecretLookup.Name, database.Status.DatabaseStatus.RootSecretLookup.Namespace,
 		database.Status.DatabaseStatus.RootSecretLookup.Field)
 	if err != nil {
@@ -40,6 +44,27 @@ func (g *PostgreSQLGarbageCollector) Clean(database *infrav1beta1.PostgreSQLData
 	var errToReturn error
 	errToReturn = g.handleHostOrDatabaseChange(postgreSQLServer, database)
 	errToReturn = g.handleUnneededCredentials(postgreSQLServer, database)
+	return errToReturn
+}
+
+func (g *PostgreSQLGarbageCollector) CleanFromSpec(database *infrav1beta1.PostgreSQLDatabase) error {
+	rootPassword, err := g.cw.GetRootPassword(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace,
+		database.Spec.RootSecretLookup.Field)
+	if err != nil {
+		// no point in proceeding. In future could also try with Spec credential
+		return err
+	}
+	postgreSQLServer, err := g.r.ServerCache.Get(database.Spec.HostName, database.Spec.RootUsername, rootPassword,
+		database.Status.DatabaseStatus.RootAuthenticationDatabase)
+	if err != nil {
+		// no point in proceeding. In future could also try with Spec credential
+		return err
+	}
+	// if an error happens, just collect it and try to clean as much as possible. Return it at the end. This is a pattern in for most of this Garbage Collector.
+	var errToReturn error
+	for _, credential := range database.Spec.Credentials {
+		errToReturn = postgreSQLServer.DropUser(database.Spec.DatabaseName, credential.UserName)
+	}
 	return errToReturn
 }
 

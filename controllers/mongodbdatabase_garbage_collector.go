@@ -23,7 +23,11 @@ func NewMongoDBGarbageCollector(r *MongoDBDatabaseReconciler, cw *ControllerWrap
 /*	For now, Garbage Collector does not drop databases, because we haven't decided if we want to delete all data.
 	Possible avenue to proceed is to have a separate option flag/struct (to be set in Spec), that will force deletion of all garbage, including data.
 */
-func (g *MongoDBDatabaseGarbageCollector) Clean(database *infrav1beta1.MongoDBDatabase) error {
+func (g *MongoDBDatabaseGarbageCollector) CleanFromStatus(database *infrav1beta1.MongoDBDatabase) error {
+	// first time, nothing to clear
+	if database.Status.LastUpdateTime == nil {
+		return nil
+	}
 	rootPassword, err := g.cw.GetRootPassword(database.Status.DatabaseStatus.RootSecretLookup.Name, database.Status.DatabaseStatus.RootSecretLookup.Namespace,
 		database.Status.DatabaseStatus.RootSecretLookup.Field)
 	if err != nil {
@@ -40,6 +44,26 @@ func (g *MongoDBDatabaseGarbageCollector) Clean(database *infrav1beta1.MongoDBDa
 	var errToReturn error
 	errToReturn = g.handleHostOrDatabaseChange(mongoDBServer, database)
 	errToReturn = g.handleUnneededCredentials(mongoDBServer, database)
+	return errToReturn
+}
+
+func (g *MongoDBDatabaseGarbageCollector) CleanFromSpec(database *infrav1beta1.MongoDBDatabase) error {
+	rootPassword, err := g.cw.GetRootPassword(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace,
+		database.Spec.RootSecretLookup.Field)
+	if err != nil {
+		// no point in proceeding. In future could also try with Spec credential
+		return err
+	}
+	mongoDBServer, err := g.r.ServerCache.Get(database.Spec.HostName, database.Spec.RootUsername, rootPassword,
+		database.Spec.RootAuthenticationDatabase)
+	if err != nil {
+		// no point in proceeding. In future could also try with Spec credential
+		return err
+	}
+	var errToReturn error
+	for _, credential := range database.Spec.Credentials {
+		errToReturn = mongoDBServer.DropUser(database.Status.DatabaseStatus.Name, credential.UserName)
+	}
 	return errToReturn
 }
 

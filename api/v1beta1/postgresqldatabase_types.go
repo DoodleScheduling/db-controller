@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"errors"
+	"github.com/doodlescheduling/kubedb/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,6 +26,11 @@ import (
 const (
 	DEFAULT_POSTGRESQL_ROOT_USER                    = "postgres"
 	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
+)
+
+// Finalizer
+const (
+	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
 )
 
 type PostgreSQLDatabaseRootSecretLookup struct {
@@ -57,7 +63,7 @@ type PostgreSQLDatabaseSpec struct {
 type PostgreSQLDatabaseStatus struct {
 	DatabaseStatus    DatabaseStatus    `json:"database"`
 	CredentialsStatus CredentialsStatus `json:"credentials"`
-	LastUpdateTime    metav1.Time       `json:"lastUpdateTime"`
+	LastUpdateTime    *metav1.Time      `json:"lastUpdateTime"`
 }
 
 // +kubebuilder:object:root=true
@@ -107,6 +113,38 @@ func (d *PostgreSQLDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatu
 	}
 	d.Status.CredentialsStatus = *statuses
 	return &removedStatuses
+}
+
+/*
+	If object doesn't contain finalizer, set it and call update function 'updateF'.
+	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
+*/
+func (d *PostgreSQLDatabase) SetFinalizer(updateF func() error) error {
+	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
+		return nil
+	}
+	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
+		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+		return updateF()
+	}
+	return nil
+}
+
+/*
+	Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
+	Call finalize function 'finalizeF', which should handle finalization logic.
+	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
+*/
+func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
+	if d.ObjectMeta.DeletionTimestamp.IsZero() {
+		return false, nil
+	}
+	if stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
+		_ = finalizeF()
+		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+		return true, updateF()
+	}
+	return true, nil
 }
 
 func (d *PostgreSQLDatabase) SetDefaults() error {
