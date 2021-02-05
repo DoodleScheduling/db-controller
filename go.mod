@@ -3,9 +3,11 @@ module github.com/doodlescheduling/kubedb
 go 1.13
 
 require (
+	4d63.com/gochecknoglobals v0.0.0-20201008074935-acfc0b28355a // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/jackc/pgx/v4 v4.10.1
+	github.com/mdempsky/maligned v0.0.0-20201101000000-d73c43cb16d0 // indirect
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/spf13/pflag v1.0.5
