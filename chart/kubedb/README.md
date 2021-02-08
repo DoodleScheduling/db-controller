@@ -7,7 +7,7 @@ Installs the [kubedb](https://github.com/DoodleScheduling/kubedb).
 To install the chart with the release name `kubedb`:
 
 ```console
-helm upgrade --install kubedb kubedb/kubedb
+helm upgrade --install kubedb chart/kubedb
 ```
 
 This command deploys the kubedb with the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.

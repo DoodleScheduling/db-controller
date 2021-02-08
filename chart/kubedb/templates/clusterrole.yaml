@@ -11,7 +11,8 @@ metadata:
   annotations:
     {{- toYaml .Values.annotations | nindent 4 }}
 rules:
-- apiGroups: ['v1']
+- apiGroups:
+  - ""
   resources:
     - "secrets"
   verbs:
@@ -20,10 +21,10 @@ rules:
     - watch
     - update
 - apiGroups:
-  - ""
+  - "infra.doodle.com"
   resources:
-  - MongoDBDatabase
-  - PostgreSQLDatabase
+  - mongodbdatabases
+  - postgresqldatabases
   verbs:
   - create
   - delete
@@ -33,10 +34,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
+  - "infra.doodle.com"
   resources:
-  - MongoDBDatabase/status
-  - PostgreSQLDatabase/status
+  - mongodbdatabases/status
+  - postgresqldatabases/status
   verbs:
   - get
   - patch
