@@ -18,15 +18,17 @@ package main
 
 import (
 	"flag"
+
 	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 	"github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"os"
+	"strings"
+
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"strings"
 
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,6 +50,7 @@ var (
 // flags
 const (
 	MetricAddr              = "metrics-addr"
+	ProbeAddr               = "probe-addr"
 	EnableLeaderElection    = "enable-leader-election"
 	LeaderElectionNamespace = "leader-election-namespace"
 	Namespaces              = "namespaces"
@@ -57,6 +60,7 @@ const (
 // config variables & defaults
 var (
 	metricsAddr             = ":8080"
+	probesAddr              = ":9558"
 	enableLeaderElection    = false
 	leaderElectionNamespace = ""
 	namespacesConfig        = ""
@@ -72,6 +76,7 @@ func init() {
 
 func main() {
 	flag.StringVar(&metricsAddr, MetricAddr, ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probesAddr, ProbeAddr, ":9558", "The address of the probe endpoints bind to.")
 	flag.BoolVar(&enableLeaderElection, EnableLeaderElection, false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -95,16 +100,18 @@ func main() {
 	metricsAddr = viper.GetString(MetricAddr)
 	enableLeaderElection = viper.GetBool(EnableLeaderElection)
 	leaderElectionNamespace = viper.GetString(LeaderElectionNamespace)
+	probesAddr = viper.GetString(ProbeAddr)
 	namespacesConfig = viper.GetString(Namespaces)
 	maxConcurrentReconciles = viper.GetInt(MaxConcurrentReconciles)
 
 	namespaces := strings.Split(namespacesConfig, ",")
 	options := ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "99a96989.doodle.com",
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		HealthProbeBindAddress: probesAddr,
+		Port:                   9443,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "99a96989.doodle.com",
 	}
 	if len(namespaces) > 0 && namespaces[0] != "" {
 		options.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)

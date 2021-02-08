@@ -164,6 +164,11 @@ func (r *MongoDBDatabaseReconciler) updateAndReturn(ctx *context.Context, databa
 	now := metav1.Now()
 	database.Status.LastUpdateTime = &now
 	if err := r.Status().Update(*ctx, database); err != nil {
+		if apierrors.IsConflict(err) {
+			return ctrl.Result{
+				Requeue: true,
+			}, nil
+		}
 		(*log).Error(err, "unable to update MongoDBDatabase status")
 		return ctrl.Result{}, err
 	}
