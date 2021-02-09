@@ -19,8 +19,8 @@ package controllers
 import (
 	"context"
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
+	"github.com/doodlescheduling/kubedb/common"
 	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
-	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ type PostgreSQLDatabaseReconciler struct {
 	Log         logr.Logger
 	Scheme      *runtime.Scheme
 	ServerCache *postgresqlAPI.Cache
-	VaultCache  *vaultAPI.Cache
+	VaultCache  *common.Cache
 }
 
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
@@ -117,7 +117,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	}
 
 	// vault connection, cached
-	vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
+	//vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
 	if err != nil {
 		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
 			WithUsername(database.Spec.RootUsername).
@@ -149,7 +149,8 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 			return status != nil && status.Username == username
 		})
 		// get user credentials from vault
-		vaultResponse, err := vault.Get(vaultAPI.VaultRequest{})
+		vault := common.Vault{}
+		vaultResponse, err := vault.Get(common.ConvertPostgreSQLDatabaseCredential(credential), database.Name, log)
 		if err != nil {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 			continue

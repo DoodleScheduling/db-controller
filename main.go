@@ -18,9 +18,9 @@ package main
 
 import (
 	"flag"
+	"github.com/doodlescheduling/kubedb/common"
 
 	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
-	"github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -142,7 +142,7 @@ func main() {
 	}
 
 	// General setup
-	vaultCache := vault.NewCache()
+	vaultCache := common.NewCache()
 
 	// MongoDBDatabase setup
 	mongoDBServerCache := mongodbAPI.NewCache()
