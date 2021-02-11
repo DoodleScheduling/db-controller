@@ -147,16 +147,6 @@ func authKubernetes(h *VaultHandler) (vault.AuthMethod, error) {
 	})
 }
 
-func convertTLSSpec(spec v1beta1.VaultTLSSpec) *vaultapi.TLSConfig {
-	return &vaultapi.TLSConfig{
-		CACert:        spec.CACert,
-		ClientCert:    spec.ClientCert,
-		ClientKey:     spec.ClientKey,
-		TLSServerName: spec.ServerName,
-		Insecure:      spec.Insecure,
-	}
-}
-
 // FromCredential creates a vault client handler
 // If the binding holds no vault address it will fallback to the env VAULT_ADDRESS
 func FromCredential(credential *DatabaseCredential, logger logr.Logger) (*VaultHandler, error) {
@@ -197,62 +187,6 @@ type VaultHandler struct {
 	auth   *vault.AuthHandler
 	logger logr.Logger
 }
-
-// ApplySecret applies the desired secret to vault
-//func (h *VaultHandler) ApplySecret(binding *v1beta1.VaultBinding, secret *corev1.Secret) (bool, error) {
-//	var writeBack bool
-//
-//	// TODO Is there such a thing as locking the path so we don't overwrite fields which would be changed at the same time?
-//	data, err := h.Read(binding.Spec.Path)
-//	if err != nil {
-//		return writeBack, err
-//	}
-//
-//	// Loop through all mapping field and apply to the vault path data
-//	for _, field := range binding.Spec.Fields {
-//		k8sField := field.Name
-//		vaultField := k8sField
-//		if field.Rename != "" {
-//			vaultField = field.Rename
-//		}
-//
-//		h.logger.Info("applying k8s field to vault", "k8sField", k8sField, "vaultField", vaultField, "vaultPath", binding.Spec.Path)
-//
-//		// If k8s secret field does not exists return an error
-//		k8sValue, ok := secret.Data[k8sField]
-//		if !ok {
-//			return writeBack, ErrK8sSecretFieldNotAvailable
-//		}
-//
-//		secret := string(k8sValue)
-//
-//		_, existingField := data[vaultField]
-//
-//		switch {
-//		case !existingField:
-//			h.logger.Info("found new field to write", "vaultField", vaultField)
-//			data[vaultField] = secret
-//			writeBack = true
-//		case data[vaultField] == secret:
-//			h.logger.Info("skipping field, no update required", "vaultField", vaultField)
-//		case binding.Spec.ForceApply == true:
-//			data[vaultField] = secret
-//			writeBack = true
-//		default:
-//			h.logger.Info("skipping field, it already exists in vault and force apply is disabled", "vaultField", vaultField)
-//		}
-//	}
-//
-//	if writeBack == true {
-//		// Finally write the secret back
-//		_, err = h.c.Logical().Write(binding.Spec.Path, data)
-//		if err != nil {
-//			return writeBack, err
-//		}
-//	}
-//
-//	return writeBack, nil
-//}
 
 // Read vault path and return data map
 // Return empty map if no data exists

@@ -3,7 +3,6 @@ module github.com/doodlescheduling/kubedb
 go 1.13
 
 require (
-	cloud.google.com/go v0.38.0
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0
