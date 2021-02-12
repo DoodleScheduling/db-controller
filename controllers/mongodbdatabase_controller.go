@@ -19,8 +19,8 @@ package controllers
 import (
 	"context"
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
+	"github.com/doodlescheduling/kubedb/common"
 	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
-	vaultAPI "github.com/doodlescheduling/kubedb/common/vault"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +37,7 @@ type MongoDBDatabaseReconciler struct {
 	Log         logr.Logger
 	Scheme      *runtime.Scheme
 	ServerCache *mongodbAPI.Cache
-	VaultCache  *vaultAPI.Cache
+	VaultCache  *common.Cache
 }
 
 // +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
@@ -113,7 +113,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	}
 
 	// vault connection, cached
-	vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
+	//vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
 	if err != nil {
 		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
 			WithUsername(database.Spec.RootUsername).
@@ -130,7 +130,8 @@ func (r *MongoDBDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			return status != nil && status.Username == username
 		})
 		// get user credentials from vault
-		vaultResponse, err := vault.Get(vaultAPI.VaultRequest{})
+		vault := common.Vault{}
+		vaultResponse, err := vault.Get(common.ConvertMongoDBDatabaseCredential(credential), username, log)
 		if err != nil {
 			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 			continue

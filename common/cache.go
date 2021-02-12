@@ -1,4 +1,4 @@
-package vault
+package common
 
 type Cache struct {
 	cache map[string]*Vault

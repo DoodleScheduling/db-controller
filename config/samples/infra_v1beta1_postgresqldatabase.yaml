@@ -15,14 +15,21 @@ spec:
   - username: keycloak
     vault:
       useAvailable: true
-      host: vault.devops
+      host: "https://vault.devops:8200"
       path: secret/doodle/devbox/keycloak/database
       userField: USERNAME
       secretField: PASSWORD
   - username: replication
     vault:
       useAvailable: true
-      host: vault.devops
-      path: secret/doodle/devbox/keycloak/database
+      host: "https://vault.devops:8200"
+      path: secret/doodle/devbox/keycloak/replication
+      userField: USERNAME
+      secretField: PASSWORD
+  - username: mirror
+    vault:
+      useAvailable: true
+      host: "https://vault.devops:8200"
+      path: secret/doodle/devbox/keycloak/mirror
       userField: USERNAME
       secretField: PASSWORD
