@@ -131,7 +131,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		})
 		// get user credentials from vault
 		vault := common.Vault{}
-		vaultResponse, err := vault.Get(common.ConvertMongoDBDatabaseCredential(credential), database.Name, log)
+		vaultResponse, err := vault.Get(common.ConvertMongoDBDatabaseCredential(credential), username, log)
 		if err != nil {
 			mongodbCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 			continue

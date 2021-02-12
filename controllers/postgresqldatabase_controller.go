@@ -150,7 +150,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		})
 		// get user credentials from vault
 		vault := common.Vault{}
-		vaultResponse, err := vault.Get(common.ConvertPostgreSQLDatabaseCredential(credential), database.Name, log)
+		vaultResponse, err := vault.Get(common.ConvertPostgreSQLDatabaseCredential(credential), username, log)
 		if err != nil {
 			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
 			continue

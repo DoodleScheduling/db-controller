@@ -35,7 +35,7 @@ func NewVault(host string) (*Vault, error) {
 	}, nil
 }
 
-func (v *Vault) Get(cred *DatabaseCredential, databaseName string, logger logr.Logger) (VaultResponse, error) {
+func (v *Vault) Get(cred *DatabaseCredential, username string, logger logr.Logger) (VaultResponse, error) {
 
 	// goran vault
 	//h, err := FromCredential(binding, logger)
@@ -47,7 +47,7 @@ func (v *Vault) Get(cred *DatabaseCredential, databaseName string, logger logr.L
 		SecretField: cred.Vault.SecretField,
 	}
 
-	data, response, err := processRequest(h, r, databaseName)
+	data, response, err := processRequest(h, r, username)
 
 	if err != nil {
 		return response, err
