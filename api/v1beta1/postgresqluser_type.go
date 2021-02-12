@@ -21,30 +21,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// defaults
-const (
-	DEFAULT_MONGODB_ROOT_USER                    = "root"
-	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
-)
-
-// Finalizer
-const (
-	MongoSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
-)
-
-// MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
-type MongoDBDatabaseSpec struct {
-	*DatabaseSpec `json:",inline"`
+type PostgreSQLUserSpec struct {
+	Database    *DatabaseReference `json:"database"`
+	Credentials *SecretReference   `json:"credentials"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
-func (in *MongoDBDatabase) GetStatusConditions() *[]metav1.Condition {
+func (in *PostgreSQLUser) GetStatusConditions() *[]metav1.Condition {
 	return &in.Status.Conditions
 }
 
-// MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
+// PostgreSQLUserStatus defines the observed state of PostgreSQLUser
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type MongoDBDatabaseStatus struct {
+type PostgreSQLUserStatus struct {
 	// Conditions holds the conditions for the VaultBinding.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -53,29 +42,29 @@ type MongoDBDatabaseStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// MongoDBDatabase is the Schema for the mongodbs API
-type MongoDBDatabase struct {
+// PostgreSQLUser is the Schema for the mongodbs API
+type PostgreSQLUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MongoDBDatabaseSpec   `json:"spec,omitempty"`
-	Status MongoDBDatabaseStatus `json:"status,omitempty"`
+	Spec   PostgreSQLUserSpec   `json:"spec,omitempty"`
+	Status PostgreSQLUserStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// MongoDBDatabaseList contains a list of MongoDBDatabase
-type MongoDBDatabaseList struct {
+// PostgreSQLUserList contains a list of PostgreSQLUser
+type PostgreSQLUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MongoDBDatabase `json:"items"`
+	Items           []PostgreSQLUser `json:"items"`
 }
 
 /*
 	If object doesn't contain finalizer, set it and call update function 'updateF'.
 	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
 */
-func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
+func (d *PostgreSQLUser) SetFinalizer(updateF func() error) error {
 	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return nil
 	}
@@ -91,7 +80,7 @@ func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
 	Call finalize function 'finalizeF', which should handle finalization logic.
 	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
 */
-func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
+func (d *PostgreSQLUser) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
@@ -103,28 +92,6 @@ func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error)
 	return true, nil
 }
 
-/*func (d *MongoDBDatabase) SetDefaults() error {
-	if d.Spec.RootUsername == "" {
-		d.Spec.RootUsername = DEFAULT_MONGODB_ROOT_USER
-	}
-	if d.Spec.RootAuthenticationDatabase == "" {
-		d.Spec.RootAuthenticationDatabase = DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE
-	}
-	if d.Spec.RootSecretLookup.Name == "" {
-		return errors.New("must specify root secret")
-	}
-	if d.Spec.RootSecretLookup.Field == "" {
-		return errors.New("must specify root secret field")
-	}
-	if d.Spec.RootSecretLookup.Namespace == "" {
-		d.Spec.RootSecretLookup.Namespace = d.ObjectMeta.Namespace
-	}
-	if d.Status.CredentialsStatus == nil || len(d.Status.CredentialsStatus) == 0 {
-		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
-	}
-	return nil
-}*/
-
 func init() {
-	SchemeBuilder.Register(&MongoDBDatabase{}, &MongoDBDatabaseList{})
+	SchemeBuilder.Register(&PostgreSQLUser{}, &PostgreSQLUserList{})
 }

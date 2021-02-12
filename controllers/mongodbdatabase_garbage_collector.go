@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	"github.com/doodlescheduling/kubedb/common/db/mongodb"
 	"github.com/go-logr/logr"
 )
 
@@ -23,7 +21,7 @@ func NewMongoDBGarbageCollector(r *MongoDBDatabaseReconciler, cw *ControllerWrap
 /*	For now, Garbage Collector does not drop databases, because we haven't decided if we want to delete all data.
 	Possible avenue to proceed is to have a separate option flag/struct (to be set in Spec), that will force deletion of all garbage, including data.
 */
-func (g *MongoDBDatabaseGarbageCollector) CleanFromStatus(database *infrav1beta1.MongoDBDatabase) error {
+/*func (g *MongoDBDatabaseGarbageCollector) CleanFromStatus(database *infrav1beta1.MongoDBDatabase) error {
 	// first time, nothing to clear
 	if database.Status.LastUpdateTime == nil {
 		return nil
@@ -92,3 +90,4 @@ func (g *MongoDBDatabaseGarbageCollector) handleUnneededCredentials(mongoDBServe
 	})
 	return errToReturn
 }
+*/

@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"errors"
 	"github.com/doodlescheduling/kubedb/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,37 +32,22 @@ const (
 	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
 )
 
-type PostgreSQLDatabaseRootSecretLookup struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Field     string `json:"field"`
-}
-
-type PostgreSQLDatabaseCredentials []PostgreSQLDatabaseCredential
-type PostgreSQLDatabaseCredential struct {
-	UserName string `json:"username"`
-	Vault    Vault  `json:"vault"`
-}
-
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
-// IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseSpec struct {
-	DatabaseName string `json:"databaseName"`
-	HostName     string `json:"hostName"`
-	// +optional
-	RootUsername string `json:"rootUsername"`
-	// +optional
-	RootAuthenticationDatabase string                             `json:"rootAuthDatabase"`
-	RootSecretLookup           PostgreSQLDatabaseRootSecretLookup `json:"rootSecretLookup"`
-	Credentials                PostgreSQLDatabaseCredentials      `json:"credentials"`
+	*DatabaseSpec `json:",inline"`
+}
+
+// GetStatusConditions returns a pointer to the Status.Conditions slice
+func (in *PostgreSQLDatabase) GetStatusConditions() *[]metav1.Condition {
+	return &in.Status.Conditions
 }
 
 // PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseStatus struct {
-	DatabaseStatus    DatabaseStatus    `json:"database"`
-	CredentialsStatus CredentialsStatus `json:"credentials"`
-	LastUpdateTime    *metav1.Time      `json:"lastUpdateTime"`
+	// Conditions holds the conditions for the VaultBinding.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -85,34 +69,6 @@ type PostgreSQLDatabaseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PostgreSQLDatabase `json:"items"`
-}
-
-/*
-	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
-	Returns removed statuses.
-*/
-func (d *PostgreSQLDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatus {
-	removedStatuses := make(CredentialsStatus, 0)
-	statuses := &d.Status.CredentialsStatus
-	for i := 0; i < len(*statuses); i++ {
-		status := (*statuses)[i]
-		found := false
-		if status != nil {
-			for _, credential := range d.Spec.Credentials {
-				if credential.UserName == status.Username {
-					found = true
-				}
-			}
-		}
-		if !found {
-			removedStatuses = append(removedStatuses, status)
-			s := append((*statuses)[:i], (*statuses)[i+1:]...)
-			statuses = &s
-			i--
-		}
-	}
-	d.Status.CredentialsStatus = *statuses
-	return &removedStatuses
 }
 
 /*
@@ -147,7 +103,7 @@ func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() err
 	return true, nil
 }
 
-func (d *PostgreSQLDatabase) SetDefaults() error {
+/*func (d *PostgreSQLDatabase) SetDefaults() error {
 	if d.Spec.RootUsername == "" {
 		d.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
 	}
@@ -167,7 +123,7 @@ func (d *PostgreSQLDatabase) SetDefaults() error {
 		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
 	}
 	return nil
-}
+}*/
 
 func init() {
 	SchemeBuilder.Register(&PostgreSQLDatabase{}, &PostgreSQLDatabaseList{})

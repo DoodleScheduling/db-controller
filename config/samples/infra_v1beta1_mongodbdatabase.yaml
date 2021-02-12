@@ -1,36 +1,29 @@
 apiVersion: infra.doodle.com/v1beta1
 kind: MongoDBDatabase
 metadata:
-  name: mongodbdatabase-sample
-  namespace: devops
+  name: my-app
+  namespace: default
 spec:
-  databaseName: "mongodb_sample"
-  hostName: "mongodb.devops:27017"
-  rootUsername: root
-  rootAuthDatabase: admin
-  rootSecretLookup:
+  address: "mongodb://localhost:27017"
+  rootSecret:
     name: mongodb
-    namespace: devops
-    field: mongodb-root-password
+    passwordField: "root-secret"
+---
+apiVersion: infra.doodle.com/v1beta1
+kind: MongoDBUser
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  database:
+    name: my-app
   credentials:
-  - username: doodle
-    vault:
-      useAvailable: true
-      host: https://vault.devops:8200
-      path: secret/doodle/devbox/monolith
-      userField: USERNAME
-      secretField: PASSWORD
-  - username: keycloak
-    vault:
-      useAvailable: true
-      host: https://vault.devops:8200
-      path: secret/doodle/devbox/monolith
-      userField: USERNAME
-      secretField: PASSWORD
-  - username: monolith-doodle
-    vault:
-      useAvailable: true
-      host: https://vault.devops:8200
-      path: secret/doodle/devbox/monolith
-      userField: USERNAME
-      secretField: PASSWORD
+    name: my-app-mongodb
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-mongodb
+  namespace: default
+data:
+  password: A=
