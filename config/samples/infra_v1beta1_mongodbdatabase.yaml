@@ -16,21 +16,21 @@ spec:
   - username: doodle
     vault:
       useAvailable: true
-      host: vault.devops
+      host: https://vault.devops:8200
       path: secret/doodle/devbox/monolith
       userField: USERNAME
       secretField: PASSWORD
   - username: keycloak
     vault:
       useAvailable: true
-      host: vault.devops
+      host: https://vault.devops:8200
       path: secret/doodle/devbox/monolith
       userField: USERNAME
       secretField: PASSWORD
   - username: monolith-doodle
     vault:
       useAvailable: true
-      host: vault.devops
+      host: https://vault.devops:8200
       path: secret/doodle/devbox/monolith
       userField: USERNAME
       secretField: PASSWORD
