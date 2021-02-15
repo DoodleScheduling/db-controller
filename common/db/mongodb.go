@@ -1,4 +1,4 @@
-package mongodb
+package db
 
 import (
 	"context"
@@ -10,6 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+)
+
+const (
+	adminDatabase   = "admin"
+	usersCollection = "system.users"
 )
 
 type Roles []Role
@@ -26,12 +31,10 @@ type User struct {
 }
 
 type MongoDBServer struct {
-	client                 *mongo.Client
-	uri                    string
-	authenticationDatabase string
+	client *mongo.Client
 }
 
-func NewMongoDBServer(ctx context.Context, uri, username, password string) (*MongoDBServer, error) {
+func NewMongoDBServer(ctx context.Context, uri, username, password string) (Handler, error) {
 	o := options.Client().ApplyURI(uri)
 	o.SetAuth(options.Credential{
 		Username: username,
@@ -48,9 +51,7 @@ func NewMongoDBServer(ctx context.Context, uri, username, password string) (*Mon
 	}
 
 	return &MongoDBServer{
-		client:                 client,
-		uri:                    uri,
-		authenticationDatabase: "admin",
+		client: client,
 	}, nil
 }
 
@@ -58,6 +59,12 @@ func (m *MongoDBServer) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return m.client.Disconnect(ctx)
+}
+
+// CreateDatabaseIfNotExists is a dummy to apply to fullfill the contract,
+// we don't need to create the database on MongoDB
+func (m *MongoDBServer) CreateDatabaseIfNotExists(database string) error {
+	return nil
 }
 
 func (m *MongoDBServer) SetupUser(database string, username string, password string) error {
@@ -98,7 +105,7 @@ func (m *MongoDBServer) getAllUsers(database string, username string) (Users, er
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	collection := m.client.Database(m.authenticationDatabase).Collection("system.users")
+	collection := m.client.Database(adminDatabase).Collection(usersCollection)
 	cursor, err := collection.Find(ctx, bson.D{primitive.E{Key: "user", Value: username}, primitive.E{Key: "db", Value: database}})
 	if err != nil {
 		return users, err

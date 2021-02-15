@@ -20,15 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/doodlescheduling/kubedb/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
+	"github.com/doodlescheduling/kubedb/common/db"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,19 +36,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const (
-	// secretIndexKey is the key used for indexing MongoDBDatabase based on
-	// their secrets.
-	secretIndexKey string = ".metadata.secret"
-)
-
 // MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
 type MongoDBDatabaseReconciler struct {
 	client.Client
 	Log        logr.Logger
 	Scheme     *runtime.Scheme
 	Recorder   record.EventRecorder
-	ClientPool *mongodbAPI.ClientPool
+	ClientPool *db.ClientPool
 }
 
 func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -106,12 +98,6 @@ func (r *MongoDBDatabaseReconciler) requestsForSecretChange(o client.Object) []r
 func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("mongodbdatabase", req.NamespacedName)
 
-	// common controller functions
-	//cw := NewControllerWrapper(*r, &ctx)
-
-	// garbage collector
-	//gc := NewMongoDBGarbageCollector(r, cw, &logger)
-
 	// get database resource by namespaced name
 	var database infrav1beta1.MongoDBDatabase
 	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
@@ -121,6 +107,8 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, err
 	}
+
+	database.SetDefaults()
 
 	// set finalizer
 	if err := database.SetFinalizer(func() error {
@@ -141,12 +129,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return reconcile.Result{}, nil
 	}
 
-	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	/*if err := gc.CleanFromStatus(&database); err != nil {
-		log.Info("Error while cleaning garbage", "error", err)
-	}*/
-
-	database, result, reconcileErr := r.reconcile(ctx, database, logger)
+	_, result, reconcileErr := reconcileDatabase(ctx, r.Client, r.ClientPool, db.NewMongoDBServer, &database, logger, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &database); err != nil {
@@ -155,49 +138,6 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return result, reconcileErr
-}
-
-func (r *MongoDBDatabaseReconciler) reconcile(ctx context.Context, database infrav1beta1.MongoDBDatabase, logger logr.Logger) (infrav1beta1.MongoDBDatabase, ctrl.Result, error) {
-	// Fetch referencing root secret
-	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{
-		Namespace: database.GetNamespace(),
-		Name:      database.Spec.RootSecret.Name,
-	}
-	err := r.Client.Get(context.TODO(), secretName, secret)
-
-	// Failed to fetch referenced secret, requeue immediately
-	if err != nil {
-		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
-		r.Recorder.Event(&database, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(&database, v1beta1.SecretNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
-	}
-
-	usr, pw, err := extractCredentials(database.Spec.RootSecret, secret)
-
-	if err != nil {
-		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
-		r.Recorder.Event(&database, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(&database, infrav1beta1.CredentialsNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
-	}
-
-	// mongoDB connection to spec host, cached
-	_, err = r.ClientPool.FromURI(context.TODO(), database.Spec.Address, usr, pw)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
-		r.Recorder.Event(&database, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(&database, infrav1beta1.ConnectionFailedReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
-	}
-
-	//There is nothing todo for MongoDB at this point, we can only verify the connection
-
-	msg := "Database successfully provisioned"
-	r.Recorder.Event(&database, "Normal", "info", msg)
-	v1beta1.DatabaseReadyCondition(&database, v1beta1.DatabaseProvisiningSuccessfulReason, msg)
-	return database, ctrl.Result{}, err
 }
 
 func (r *MongoDBDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.MongoDBDatabase) error {

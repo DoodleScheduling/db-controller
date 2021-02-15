@@ -5,6 +5,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Finalizer
+const (
+	Finalizer = "infra.finalizers.doodle.com"
+)
+
 // Status conditions
 const (
 	DatabaseReadyConditionType = "DatabaseReady"
@@ -21,6 +26,7 @@ const (
 	UserNotProvisionedReason            = "UserNotProvisioned"
 	UserProvisioningSuccessfulReason    = "UserProvisioningSuccessful"
 	CredentialsNotFoundReason           = "CredentialsNotFound"
+	CreateDatabaseFailedReason          = "CreateDatabaseFailed"
 )
 
 // DatabaseSpec defines the desired state of MongoDBDatabase
@@ -60,7 +66,7 @@ type SecretReference struct {
 	PasswordField string `json:"passwordField"`
 }
 
-// ConditionalResource is a resource with conditions
+// conditionalResource is a resource with conditions
 type conditionalResource interface {
 	GetStatusConditions() *[]metav1.Condition
 }

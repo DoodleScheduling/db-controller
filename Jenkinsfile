@@ -5,7 +5,7 @@ podTemplate(label: 'kubedb',
   containers: [
     containerTemplate(
       name: 'golang',
-      image: 'bitnami/golang:1.13',
+      image: 'bitnami/golang:1.15',
       ttyEnabled: true
     ),
     containerTemplate(
@@ -28,7 +28,7 @@ podTemplate(label: 'kubedb',
     ansiColor("xterm") {
       stage('checkout') {
         checkout(scm)
-      
+
         container('docker') {
           dockerAuth()
         }
@@ -66,8 +66,8 @@ podTemplate(label: 'kubedb',
             bumpImageVersion(env.TAG_NAME)
 
             tgz="kubedb-${version}.tgz"
+            sh "cp config/crd/bases/* chart/kubedb/crds"
             sh "helm package chart/kubedb"
-
           }
 
           container('golang') {

@@ -28,11 +28,13 @@ type MongoDBUserSpec struct {
 	// +required
 	Credentials *SecretReference `json:"credentials"`
 
-	// +required
-	Roles []*MongoDBRole `json:"roles"`
-
+	// Roles is not yet suppported
 	// +optional
-	CustomData map[string]string `json:"customData"`
+	//Roles []*MongoDBRole `json:"roles"`
+
+	// CustomData is not yet supported
+	// +optional
+	//CustomData map[string]string `json:"customData"`
 }
 
 // MongoDBRole see https://docs.mongodb.com/manual/reference/method/db.createUser/#create-user-with-roles
@@ -60,8 +62,8 @@ type MongoDBUserStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=mdu
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].status",description=""
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].message",description=""
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"UserReady\")].status",description=""
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"UserReady\")].message",description=""
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
 // MongoDBUser is the Schema for the mongodbs API
@@ -73,6 +75,14 @@ type MongoDBUser struct {
 	Status MongoDBUserStatus `json:"status,omitempty"`
 }
 
+func (in *MongoDBUser) GetDatabase() string {
+	return in.Spec.Database.Name
+}
+
+func (in *MongoDBUser) GetCredentials() *SecretReference {
+	return in.Spec.Credentials
+}
+
 // +kubebuilder:object:root=true
 
 // MongoDBUserList contains a list of MongoDBUser
@@ -82,33 +92,29 @@ type MongoDBUserList struct {
 	Items           []MongoDBUser `json:"items"`
 }
 
-/*
-	If object doesn't contain finalizer, set it and call update function 'updateF'.
-	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-*/
+// If object doesn't contain finalizer, set it and call update function 'updateF'.
+// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
 func (d *MongoDBUser) SetFinalizer(updateF func() error) error {
 	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return nil
 	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer)
+	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
+		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
 		return updateF()
 	}
 	return nil
 }
 
-/*
-	Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-	Call finalize function 'finalizeF', which should handle finalization logic.
-	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-*/
+// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
+// Call finalize function 'finalizeF', which should handle finalization logic.
+// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
 func (d *MongoDBUser) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer) {
+	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
 		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, MongoSQLDatabaseControllerFinalizer)
+		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
 		return true, updateF()
 	}
 	return true, nil

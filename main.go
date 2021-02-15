@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 
-	mongodbAPI "github.com/doodlescheduling/kubedb/common/db/mongodb"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -36,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
+	"github.com/doodlescheduling/kubedb/common/db"
 	"github.com/doodlescheduling/kubedb/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -144,7 +144,7 @@ func main() {
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
 		Scheme:     mgr.GetScheme(),
-		ClientPool: mongodbAPI.NewClientPool(),
+		ClientPool: db.NewClientPool(),
 		Recorder:   mgr.GetEventRecorderFor("MongoDBDatabase"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBDatabase")
@@ -156,7 +156,7 @@ func main() {
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controllers").WithName("MongoDBUser"),
 		Scheme:     mgr.GetScheme(),
-		ClientPool: mongodbAPI.NewClientPool(),
+		ClientPool: db.NewClientPool(),
 		Recorder:   mgr.GetEventRecorderFor("MongoDBUser"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBUser")
@@ -164,17 +164,29 @@ func main() {
 	}
 
 	// PostgreSQLDatabase setup
-	/*postgreSQLServerCache := postgresqlAPI.NewCache()
 	if err = (&controllers.PostgreSQLDatabaseReconciler{
-		Client:      mgr.GetClient(),
-		Log:         ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
-		Scheme:      mgr.GetScheme(),
-		ServerCache: postgreSQLServerCache,
-		Recorder:    mgr.GetEventRecorderFor("PostgreSQLDatabase"),
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
+		Scheme:     mgr.GetScheme(),
+		ClientPool: db.NewClientPool(),
+		Recorder:   mgr.GetEventRecorderFor("PostgreSQLDatabase"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLDatabase")
 		os.Exit(1)
-	}*/
+	}
+
+	// PostgreSQLUser setup
+	if err = (&controllers.PostgreSQLUserReconciler{
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controllers").WithName("PostgreSQLUser"),
+		Scheme:     mgr.GetScheme(),
+		ClientPool: db.NewClientPool(),
+		Recorder:   mgr.GetEventRecorderFor("PostgreSQLUser"),
+	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLUser")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

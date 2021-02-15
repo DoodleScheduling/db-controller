@@ -6,23 +6,23 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: mongodbusers.infra.doodle.com
+  name: postgresqlusers.dbprovisioning.infra.doodle.com
 spec:
-  group: infra.doodle.com
+  group: dbprovisioning.infra.doodle.com
   names:
-    kind: MongoDBUser
-    listKind: MongoDBUserList
-    plural: mongodbusers
+    kind: PostgreSQLUser
+    listKind: PostgreSQLUserList
+    plural: postgresqlusers
     shortNames:
-    - mdu
-    singular: mongodbuser
+    - pgu
+    singular: postgresqluser
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].status
+    - jsonPath: .status.conditions[?(@.type=="UserReady")].status
       name: Ready
       type: string
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].message
+    - jsonPath: .status.conditions[?(@.type=="UserReady")].message
       name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -31,7 +31,7 @@ spec:
     name: v1beta1
     schema:
       openAPIV3Schema:
-        description: MongoDBUser is the Schema for the mongodbs API
+        description: PostgreSQLUser is the Schema for the mongodbs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -64,10 +64,6 @@ spec:
                 required:
                 - name
                 type: object
-              customData:
-                additionalProperties:
-                  type: string
-                type: object
               database:
                 description: DatabaseReference is a named reference to a database
                   kind
@@ -79,22 +75,12 @@ spec:
                 required:
                 - name
                 type: object
-              roles:
-                items:
-                  description: MongoDBRole see https://docs.mongodb.com/manual/reference/method/db.createUser/#create-user-with-roles
-                  properties:
-                    role:
-                      default: readWrite
-                      type: string
-                  type: object
-                type: array
             required:
             - credentials
             - database
-            - roles
             type: object
           status:
-            description: 'MongoDBUserStatus defines the observed state of MongoDBUser
+            description: 'PostgreSQLUserStatus defines the observed state of PostgreSQLUser
               IMPORTANT: Run "make" to regenerate code after modifying this file'
             properties:
               conditions:

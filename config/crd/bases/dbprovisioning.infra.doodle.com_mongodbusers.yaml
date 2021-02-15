@@ -6,20 +6,32 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: postgresqldatabases.infra.doodle.com
+  name: mongodbusers.dbprovisioning.infra.doodle.com
 spec:
-  group: infra.doodle.com
+  group: dbprovisioning.infra.doodle.com
   names:
-    kind: PostgreSQLDatabase
-    listKind: PostgreSQLDatabaseList
-    plural: postgresqldatabases
-    singular: postgresqldatabase
+    kind: MongoDBUser
+    listKind: MongoDBUserList
+    plural: mongodbusers
+    shortNames:
+    - mdu
+    singular: mongodbuser
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="UserReady")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="UserReady")].message
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
     schema:
       openAPIV3Schema:
-        description: PostgreSQLDatabase is the Schema for the postgresqls API
+        description: MongoDBUser is the Schema for the mongodbs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,17 +46,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
             properties:
-              address:
-                description: The connect URI
-                type: string
-              databaseName:
-                description: DatabaseName is by default the same as metata.name
-                type: string
-              rootSecret:
-                description: Contains a credentials set of a user with enough permission
-                  to manage databases and user accounts
+              credentials:
+                description: SecretReference is a named reference to a secret which
+                  contains user credentials
                 properties:
                   name:
                     description: Name referrs to the name of the secret, must be located
@@ -59,12 +64,23 @@ spec:
                 required:
                 - name
                 type: object
+              database:
+                description: DatabaseReference is a named reference to a database
+                  kind
+                properties:
+                  name:
+                    description: Name referrs to the name of the database kind, mist
+                      be located within the same namespace
+                    type: string
+                required:
+                - name
+                type: object
             required:
-            - address
-            - rootSecret
+            - credentials
+            - database
             type: object
           status:
-            description: 'PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
+            description: 'MongoDBUserStatus defines the observed state of MongoDBUser
               IMPORTANT: Run "make" to regenerate code after modifying this file'
             properties:
               conditions:

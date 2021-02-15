@@ -37,6 +37,46 @@ rules:
 - apiGroups:
   - infra.doodle.com
   resources:
+  - PostgreSQLUsers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLUsers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLdatabases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLdatabases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infra.doodle.com
+  resources:
   - mongodbdatabases
   verbs:
   - create

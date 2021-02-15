@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// MongoDBUserReconciler reconciles a MongoDBUser object
-type MongoDBUserReconciler struct {
+// PostgreSQLUserReconciler reconciles a PostgreSQLUser object
+type PostgreSQLUserReconciler struct {
 	client.Client
 	Log        logr.Logger
 	Scheme     *runtime.Scheme
@@ -45,11 +45,11 @@ type MongoDBUserReconciler struct {
 	ClientPool *db.ClientPool
 }
 
-func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
-	// Index the MongoDBUser by the Credentials references they point at
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.MongoDBUser{}, credentialsIndexKey,
+func (r *PostgreSQLUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+	// Index the PostgreSQLUser by the Credentials references they point at
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.PostgreSQLUser{}, credentialsIndexKey,
 		func(o client.Object) []string {
-			usr := o.(*infrav1beta1.MongoDBUser)
+			usr := o.(*infrav1beta1.PostgreSQLUser)
 			return []string{
 				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Credentials),
 			}
@@ -58,10 +58,10 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 		return err
 	}
 
-	// Index the MongoDBUser by the Database references they point at
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.MongoDBUser{}, dbIndexKey,
+	// Index the PostgreSQLUser by the Database references they point at
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.PostgreSQLUser{}, dbIndexKey,
 		func(o client.Object) []string {
-			usr := o.(*infrav1beta1.MongoDBUser)
+			usr := o.(*infrav1beta1.PostgreSQLUser)
 			return []string{
 				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Database),
 			}
@@ -71,27 +71,27 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.MongoDBUser{}).
+		For(&infrav1beta1.PostgreSQLUser{}).
 		Watches(
 			&source.Kind{Type: &corev1.Secret{}},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
 		).
 		Watches(
-			&source.Kind{Type: &infrav1beta1.MongoDBDatabase{}},
+			&source.Kind{Type: &infrav1beta1.PostgreSQLDatabase{}},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForDatabaseChange),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+func (r *PostgreSQLUserReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
 	s, ok := o.(*corev1.Secret)
 	if !ok {
 		panic(fmt.Sprintf("expected a Secret, got %T", o))
 	}
 
 	ctx := context.Background()
-	var list infrav1beta1.MongoDBUserList
+	var list infrav1beta1.PostgreSQLUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		secretIndexKey: objectKey(s).String(),
 	}); err != nil {
@@ -100,21 +100,21 @@ func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []recon
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a mongodbuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a PostgreSQLuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
 	return reqs
 }
 
-func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []reconcile.Request {
-	s, ok := o.(*infrav1beta1.MongoDBDatabase)
+func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []reconcile.Request {
+	s, ok := o.(*infrav1beta1.PostgreSQLDatabase)
 	if !ok {
-		panic(fmt.Sprintf("expected a MongoDBDatabase, got %T", o))
+		panic(fmt.Sprintf("expected a PostgreSQLDatabase, got %T", o))
 	}
 
 	ctx := context.Background()
-	var list infrav1beta1.MongoDBUserList
+	var list infrav1beta1.PostgreSQLUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		secretIndexKey: objectKey(s).String(),
 	}); err != nil {
@@ -123,28 +123,28 @@ func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []rec
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced database from a mongodbuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced database from a PostgreSQLuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
 	return reqs
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=MongoDBUsers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=MongoDBUsers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLUsers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLUsers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := r.Log.WithValues("MongoDBUser", req.NamespacedName)
+func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := r.Log.WithValues("PostgreSQLUser", req.NamespacedName)
 
 	// common controller functions
 	//cw := NewControllerWrapper(*r, &ctx)
 
 	// garbage collector
-	//gc := NewMongoDBGarbageCollector(r, cw, &logger)
+	//gc := NewPostgreSQLGarbageCollector(r, cw, &logger)
 
 	// get database resource by namespaced name
-	var user infrav1beta1.MongoDBUser
+	var user infrav1beta1.PostgreSQLUser
 	if err := r.Get(ctx, req.NamespacedName, &user); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -175,8 +175,8 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Info("Error while cleaning garbage", "error", err)
 	}*/
 
-	var database infrav1beta1.MongoDBDatabase
-	_, result, reconcileErr := reconcileUser(ctx, &database, r.Client, r.ClientPool, db.NewMongoDBServer, &user, logger, r.Recorder)
+	var database infrav1beta1.PostgreSQLDatabase
+	_, result, reconcileErr := reconcileUser(ctx, &database, r.Client, r.ClientPool, db.NewPostgreSQLServer, &user, logger, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
@@ -187,9 +187,9 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return result, reconcileErr
 }
 
-func (r *MongoDBUserReconciler) patchStatus(ctx context.Context, database *infrav1beta1.MongoDBUser) error {
+func (r *PostgreSQLUserReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLUser) error {
 	key := client.ObjectKeyFromObject(database)
-	latest := &infrav1beta1.MongoDBUser{}
+	latest := &infrav1beta1.PostgreSQLUser{}
 	if err := r.Client.Get(ctx, key, latest); err != nil {
 		return err
 	}

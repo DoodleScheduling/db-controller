@@ -27,11 +27,6 @@ const (
 	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
 )
 
-// Finalizer
-const (
-	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
-)
-
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
@@ -50,8 +45,14 @@ type PostgreSQLDatabaseStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +genclient
+// +genclient:Namespaced
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=pgd
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].status",description=""
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].message",description=""
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
 // PostgreSQLDatabase is the Schema for the postgresqls API
 type PostgreSQLDatabase struct {
@@ -60,6 +61,22 @@ type PostgreSQLDatabase struct {
 
 	Spec   PostgreSQLDatabaseSpec   `json:"spec,omitempty"`
 	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
+}
+
+func (in *PostgreSQLDatabase) GetAddress() string {
+	return in.Spec.Address
+}
+
+func (in *PostgreSQLDatabase) GetRootSecret() *SecretReference {
+	return in.Spec.RootSecret
+}
+
+func (in *PostgreSQLDatabase) GetDatabaseName() string {
+	if in.Spec.DatabaseName != "" {
+		return in.Spec.DatabaseName
+	}
+
+	return in.GetName()
 }
 
 // +kubebuilder:object:root=true
@@ -71,59 +88,41 @@ type PostgreSQLDatabaseList struct {
 	Items           []PostgreSQLDatabase `json:"items"`
 }
 
-/*
-	If object doesn't contain finalizer, set it and call update function 'updateF'.
-	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-*/
+// If object doesn't contain finalizer, set it and call update function 'updateF'.
+// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
 func (d *PostgreSQLDatabase) SetFinalizer(updateF func() error) error {
 	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return nil
 	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
+		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
 		return updateF()
 	}
 	return nil
 }
 
-/*
-	Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-	Call finalize function 'finalizeF', which should handle finalization logic.
-	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-*/
+// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
+// Call finalize function 'finalizeF', which should handle finalization logic.
+// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
 func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
+	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
 		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
 		return true, updateF()
 	}
 	return true, nil
 }
 
-/*func (d *PostgreSQLDatabase) SetDefaults() error {
-	if d.Spec.RootUsername == "" {
-		d.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
+func (d *PostgreSQLDatabase) SetDefaults() error {
+	if d.Spec.DatabaseName == "" {
+		d.Spec.DatabaseName = d.GetName()
 	}
-	if d.Spec.RootAuthenticationDatabase == "" {
-		d.Spec.RootAuthenticationDatabase = DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE
-	}
-	if d.Spec.RootSecretLookup.Name == "" {
-		return errors.New("must specify root secret")
-	}
-	if d.Spec.RootSecretLookup.Field == "" {
-		return errors.New("must specify root secret field")
-	}
-	if d.Spec.RootSecretLookup.Namespace == "" {
-		d.Spec.RootSecretLookup.Namespace = d.ObjectMeta.Namespace
-	}
-	if d.Status.CredentialsStatus == nil || len(d.Status.CredentialsStatus) == 0 {
-		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
-	}
+
 	return nil
-}*/
+}
 
 func init() {
 	SchemeBuilder.Register(&PostgreSQLDatabase{}, &PostgreSQLDatabaseList{})
