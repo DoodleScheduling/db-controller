@@ -7,7 +7,8 @@ import (
 
 // Status conditions
 const (
-	ProvisionedCondition = "Provisioned"
+	DatabaseReadyConditionType = "DatabaseReady"
+	UserReadyConditionType     = "UserReady"
 )
 
 // Status reasons
@@ -24,30 +25,38 @@ const (
 
 // DatabaseSpec defines the desired state of MongoDBDatabase
 type DatabaseSpec struct {
-	// The name of the database, if not set the name is taken from metadata.name
+	// DatabaseName is by default the same as metata.name
 	// +optional
 	DatabaseName string `json:"databaseName"`
 
-	// The MongoDB URI
+	// The connect URI
 	// +required
 	Address string `json:"address"`
 
+	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
 }
 
+// DatabaseReference is a named reference to a database kind
 type DatabaseReference struct {
+	// Name referrs to the name of the database kind, mist be located within the same namespace
+	// +required
 	Name string `json:"name"`
 }
 
+// SecretReference is a named reference to a secret which contains user credentials
 type SecretReference struct {
+	// Name referrs to the name of the secret, must be located whithin the same namespace
 	// +required
 	Name string `json:"name"`
 
 	// +optional
+	// +kubebuilder:default:=username
 	UserField string `json:"userField"`
 
-	// +required
+	// +optional
+	// +kubebuilder:default:=password
 	PasswordField string `json:"passwordField"`
 }
 
@@ -56,12 +65,20 @@ type conditionalResource interface {
 	GetStatusConditions() *[]metav1.Condition
 }
 
-func NotProvisioned(in conditionalResource, reason, message string) {
-	setResourceCondition(in, ProvisionedCondition, metav1.ConditionFalse, reason, message)
+func DatabaseNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
-func Provisioned(in conditionalResource, reason, message string) {
-	setResourceCondition(in, ProvisionedCondition, metav1.ConditionTrue, reason, message)
+func DatabaseReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionTrue, reason, message)
+}
+
+func UserNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, UserReadyConditionType, metav1.ConditionFalse, reason, message)
+}
+
+func UserReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, UserReadyConditionType, metav1.ConditionTrue, reason, message)
 }
 
 // setResourceCondition sets the given condition with the given status,

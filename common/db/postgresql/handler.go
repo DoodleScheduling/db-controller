@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -16,13 +17,8 @@ type PostgreSQLServer struct {
 	RootDatabase string
 }
 
-func getPostgreSQLConnectionURI(host string, rootUser string, rootPassword string, rootDatabase string) string {
-	// alternative dsn string: "host=%s port=%s user=%s password=%s dbname=%s"
-	return fmt.Sprintf("postgresql://%s:%s@%s/%s", rootUser, rootPassword, host, rootDatabase)
-}
-
-func NewPostgreSQLServer(host string, rootUser string, rootPassword string, rootDatabase string) (*PostgreSQLServer, error) {
-	dbpool, err := pgxpool.Connect(context.Background(), getPostgreSQLConnectionURI(host, rootUser, rootPassword, rootDatabase))
+func NewPostgreSQLServer(ctx context.Context, uri, username, password string) (*PostgreSQLServer, error) {
+	/*dbpool, err := pgxpool.Connect(context.Background(), getPostgreSQLConnectionURI(host, rootUser, rootPassword, rootDatabase))
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +28,8 @@ func NewPostgreSQLServer(host string, rootUser string, rootPassword string, root
 		RootUser:     rootUser,
 		RootPassword: rootPassword,
 		RootDatabase: rootDatabase,
-	}, nil
+	}, nil*/
+	return nil, nil
 }
 
 func (s *PostgreSQLServer) Close() {

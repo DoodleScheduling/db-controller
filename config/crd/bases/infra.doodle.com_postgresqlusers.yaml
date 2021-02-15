@@ -6,32 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: mongodbdatabases.infra.doodle.com
+  name: postgresqlusers.infra.doodle.com
 spec:
   group: infra.doodle.com
   names:
-    kind: MongoDBDatabase
-    listKind: MongoDBDatabaseList
-    plural: mongodbdatabases
-    shortNames:
-    - mdb
-    singular: mongodbdatabase
+    kind: PostgreSQLUser
+    listKind: PostgreSQLUserList
+    plural: postgresqlusers
+    singular: postgresqluser
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].status
-      name: Ready
-      type: string
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].message
-      name: Status
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1beta1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: MongoDBDatabase is the Schema for the mongodbs API
+        description: PostgreSQLUser is the Schema for the mongodbs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -46,17 +34,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
             properties:
-              address:
-                description: The connect URI
-                type: string
-              databaseName:
-                description: DatabaseName is by default the same as metata.name
-                type: string
-              rootSecret:
-                description: Contains a credentials set of a user with enough permission
-                  to manage databases and user accounts
+              credentials:
+                description: SecretReference is a named reference to a secret which
+                  contains user credentials
                 properties:
                   name:
                     description: Name referrs to the name of the secret, must be located
@@ -71,12 +52,23 @@ spec:
                 required:
                 - name
                 type: object
+              database:
+                description: DatabaseReference is a named reference to a database
+                  kind
+                properties:
+                  name:
+                    description: Name referrs to the name of the database kind, mist
+                      be located within the same namespace
+                    type: string
+                required:
+                - name
+                type: object
             required:
-            - address
-            - rootSecret
+            - credentials
+            - database
             type: object
           status:
-            description: 'MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
+            description: 'PostgreSQLUserStatus defines the observed state of PostgreSQLUser
               IMPORTANT: Run "make" to regenerate code after modifying this file'
             properties:
               conditions:

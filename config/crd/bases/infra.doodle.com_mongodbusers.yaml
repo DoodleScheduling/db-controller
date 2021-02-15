@@ -6,16 +6,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: mongodbdatabases.infra.doodle.com
+  name: mongodbusers.infra.doodle.com
 spec:
   group: infra.doodle.com
   names:
-    kind: MongoDBDatabase
-    listKind: MongoDBDatabaseList
-    plural: mongodbdatabases
+    kind: MongoDBUser
+    listKind: MongoDBUserList
+    plural: mongodbusers
     shortNames:
-    - mdb
-    singular: mongodbdatabase
+    - mdu
+    singular: mongodbuser
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -31,7 +31,7 @@ spec:
     name: v1beta1
     schema:
       openAPIV3Schema:
-        description: MongoDBDatabase is the Schema for the mongodbs API
+        description: MongoDBUser is the Schema for the mongodbs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -46,17 +46,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
             properties:
-              address:
-                description: The connect URI
-                type: string
-              databaseName:
-                description: DatabaseName is by default the same as metata.name
-                type: string
-              rootSecret:
-                description: Contains a credentials set of a user with enough permission
-                  to manage databases and user accounts
+              credentials:
+                description: SecretReference is a named reference to a secret which
+                  contains user credentials
                 properties:
                   name:
                     description: Name referrs to the name of the secret, must be located
@@ -71,12 +64,37 @@ spec:
                 required:
                 - name
                 type: object
+              customData:
+                additionalProperties:
+                  type: string
+                type: object
+              database:
+                description: DatabaseReference is a named reference to a database
+                  kind
+                properties:
+                  name:
+                    description: Name referrs to the name of the database kind, mist
+                      be located within the same namespace
+                    type: string
+                required:
+                - name
+                type: object
+              roles:
+                items:
+                  description: MongoDBRole see https://docs.mongodb.com/manual/reference/method/db.createUser/#create-user-with-roles
+                  properties:
+                    role:
+                      default: readWrite
+                      type: string
+                  type: object
+                type: array
             required:
-            - address
-            - rootSecret
+            - credentials
+            - database
+            - roles
             type: object
           status:
-            description: 'MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
+            description: 'MongoDBUserStatus defines the observed state of MongoDBUser
               IMPORTANT: Run "make" to regenerate code after modifying this file'
             properties:
               conditions:

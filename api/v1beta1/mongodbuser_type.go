@@ -22,8 +22,24 @@ import (
 )
 
 type MongoDBUserSpec struct {
-	Database    *DatabaseReference `json:"database"`
-	Credentials *SecretReference   `json:"credentials"`
+	// +required
+	Database *DatabaseReference `json:"database"`
+
+	// +required
+	Credentials *SecretReference `json:"credentials"`
+
+	// +required
+	Roles []*MongoDBRole `json:"roles"`
+
+	// +optional
+	CustomData map[string]string `json:"customData"`
+}
+
+// MongoDBRole see https://docs.mongodb.com/manual/reference/method/db.createUser/#create-user-with-roles
+type MongoDBRole struct {
+	// +optional
+	// +kubebuilder:default:=readWrite
+	Role string `json:"role"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -39,8 +55,14 @@ type MongoDBUserStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +genclient
+// +genclient:Namespaced
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=mdu
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].status",description=""
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].message",description=""
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
 // MongoDBUser is the Schema for the mongodbs API
 type MongoDBUser struct {

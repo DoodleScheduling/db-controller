@@ -7,7 +7,7 @@ spec:
   address: "mongodb://localhost:27017"
   rootSecret:
     name: mongodb
-    passwordField: "root-secret"
+    passwordField: "mongodb-root-password"
 ---
 apiVersion: infra.doodle.com/v1beta1
 kind: MongoDBUser
@@ -26,4 +26,5 @@ metadata:
   name: my-app-mongodb
   namespace: default
 data:
-  password: A=
+  password: MTIzNA==
+  username: MTIzNA==

@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	// secretIndexKey is the key used for indexing VaultBindings based on
+	// secretIndexKey is the key used for indexing MongoDBUsers based on
 	// their secrets.
 	credentialsIndexKey string = ".metadata.credentials"
 	dbIndexKey          string = ".metadata.database"
@@ -117,9 +117,9 @@ func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []recon
 }
 
 func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []reconcile.Request {
-	s, ok := o.(*infrav1beta1.MongoDBUser)
+	s, ok := o.(*infrav1beta1.MongoDBDatabase)
 	if !ok {
-		panic(fmt.Sprintf("expected a MongoDBUser, got %T", o))
+		panic(fmt.Sprintf("expected a MongoDBDatabase, got %T", o))
 	}
 
 	ctx := context.Background()
@@ -208,7 +208,7 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 	if err != nil {
 		msg := fmt.Sprintf("Referencing database was not found: %s", err.Error())
 		r.Recorder.Event(&user, "Normal", "error", msg)
-		infrav1beta1.NotProvisioned(&user, v1beta1.DatabaseNotFoundReason, msg)
+		infrav1beta1.DatabaseNotReadyCondition(&user, v1beta1.DatabaseNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, err
 	}
 
@@ -224,17 +224,25 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 	if err != nil {
 		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
 		r.Recorder.Event(&user, "Normal", "error", msg)
-		infrav1beta1.NotProvisioned(&user, v1beta1.SecretNotFoundReason, msg)
+		infrav1beta1.DatabaseNotReadyCondition(&user, v1beta1.SecretNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, err
 	}
 
-	// mongoDB connection to spec host, cached
-	dbHandler, err := r.ClientPool.FromURI(context.TODO(), buildURI(database.Spec.Address, secret))
+	usr, pw, err := extractCredentials(database.Spec.RootSecret, secret)
+
+	if err != nil {
+		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
+		r.Recorder.Event(&user, "Normal", "error", msg)
+		infrav1beta1.DatabaseNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, msg)
+		return user, ctrl.Result{Requeue: true}, err
+	}
+
+	dbHandler, err := r.ClientPool.FromURI(context.TODO(), database.Spec.Address, usr, pw)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		r.Recorder.Event(&user, "Normal", "error", msg)
-		infrav1beta1.NotProvisioned(&user, infrav1beta1.ConnectionFailedReason, msg)
+		infrav1beta1.DatabaseNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, msg)
 		return user, ctrl.Result{Requeue: true}, err
 	}
 
@@ -246,26 +254,31 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 	}
 
 	err = r.Client.Get(context.TODO(), credentialsName, credentials)
-	usr, pw, err := extractCredentials(user.Spec.Credentials, credentials)
+	usr, pw, err = extractCredentials(user.Spec.Credentials, credentials)
 
 	if err != nil {
 		msg := fmt.Sprintf("No credentials found to provision user account: %s", err.Error())
 		r.Recorder.Event(&user, "Normal", "error", msg)
-		infrav1beta1.NotProvisioned(&user, infrav1beta1.CredentialsNotFoundReason, msg)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, err
 	}
 
-	err = dbHandler.SetupUser(database.GetName(), usr, pw)
+	dbName := database.GetName()
+	if database.Spec.DatabaseName != "" {
+		dbName = database.Spec.DatabaseName
+	}
+
+	err = dbHandler.SetupUser(dbName, usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		r.Recorder.Event(&user, "Normal", "error", msg)
-		infrav1beta1.NotProvisioned(&user, infrav1beta1.ConnectionFailedReason, msg)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, msg)
 		return user, ctrl.Result{Requeue: true}, err
 	}
 
 	msg := "User successfully provisioned"
 	r.Recorder.Event(&user, "Normal", "info", msg)
-	v1beta1.Provisioned(&user, v1beta1.UserProvisioningSuccessfulReason, msg)
+	v1beta1.UserReadyCondition(&user, v1beta1.UserProvisioningSuccessfulReason, msg)
 	return user, ctrl.Result{}, err
 }
 

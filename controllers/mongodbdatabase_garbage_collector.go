@@ -6,14 +6,12 @@ import (
 
 type MongoDBDatabaseGarbageCollector struct {
 	r   *MongoDBDatabaseReconciler
-	cw  *ControllerWrapper
 	log *logr.Logger
 }
 
-func NewMongoDBGarbageCollector(r *MongoDBDatabaseReconciler, cw *ControllerWrapper, log *logr.Logger) *MongoDBDatabaseGarbageCollector {
+func NewMongoDBGarbageCollector(r *MongoDBDatabaseReconciler, log *logr.Logger) *MongoDBDatabaseGarbageCollector {
 	return &MongoDBDatabaseGarbageCollector{
 		r:   r,
-		cw:  cw,
 		log: log,
 	}
 }
