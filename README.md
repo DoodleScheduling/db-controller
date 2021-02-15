@@ -1,6 +1,7 @@
 # Database controller
 
 Kubernetes Controller that deals with database and user provisioning.
+**Note**: This controller does not deploy database servers but rather manage on top of existing ones, use existing operators for this.
 
 ## Example for PostgreSQL
 

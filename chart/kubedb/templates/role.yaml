@@ -34,3 +34,12 @@ rules:
     verbs:
       - delete
       - get
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - create
+      - delete
+      - update
+      - get
