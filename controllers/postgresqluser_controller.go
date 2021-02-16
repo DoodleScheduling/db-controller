@@ -100,7 +100,7 @@ func (r *PostgreSQLUserReconciler) requestsForSecretChange(o client.Object) []re
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a PostgreSQLuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a postgresqluser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
@@ -123,7 +123,7 @@ func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced database from a PostgreSQLuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced database from a postgresqluser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
@@ -136,6 +136,7 @@ func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []
 
 func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("PostgreSQLUser", req.NamespacedName)
+	logger.Info("reconciling PostgreSQLUser")
 
 	// common controller functions
 	//cw := NewControllerWrapper(*r, &ctx)

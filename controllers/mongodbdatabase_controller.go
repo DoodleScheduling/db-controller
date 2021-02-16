@@ -97,6 +97,7 @@ func (r *MongoDBDatabaseReconciler) requestsForSecretChange(o client.Object) []r
 
 func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("mongodbdatabase", req.NamespacedName)
+	logger.Info("reconciling MongoDBDatabase")
 
 	// get database resource by namespaced name
 	var database infrav1beta1.MongoDBDatabase

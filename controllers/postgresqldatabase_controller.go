@@ -96,7 +96,8 @@ func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := r.Log.WithValues("PostgreSQLdatabase", req.NamespacedName)
+	logger := r.Log.WithValues("PostgreSQLDatabase", req.NamespacedName)
+	logger.Info("reconciling PostgreSQLDatabase")
 
 	// get database resource by namespaced name
 	var database infrav1beta1.PostgreSQLDatabase

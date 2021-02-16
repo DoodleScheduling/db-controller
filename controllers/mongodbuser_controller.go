@@ -136,6 +136,7 @@ func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []rec
 
 func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("MongoDBUser", req.NamespacedName)
+	logger.Info("reconciling MongoDBUser")
 
 	// common controller functions
 	//cw := NewControllerWrapper(*r, &ctx)
