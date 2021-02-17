@@ -21,10 +21,12 @@ rules:
     - watch
     - update
 - apiGroups:
-  - "infra.doodle.com"
+  - "dbprovisioning.infra.doodle.com"
   resources:
   - mongodbdatabases
+  - mongodbusers
   - postgresqldatabases
+  - postgresqlusers
   verbs:
   - create
   - delete
@@ -34,12 +36,26 @@ rules:
   - update
   - watch
 - apiGroups:
-  - "infra.doodle.com"
+  - "dbprovisioning.infra.doodle.com"
   resources:
   - mongodbdatabases/status
+  - mongodbusers/status
   - postgresqldatabases/status
+  - postgresqlusers/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 {{- end }}

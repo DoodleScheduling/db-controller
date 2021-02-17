@@ -1,17 +1,106 @@
-# KUBEDB
+# Database controller
 
-Kubernetes Controller that sets up databases, credentials and permissions in Doodle databases.
+Kubernetes Controller that deals with database and user provisioning.
+**Note**: This controller does not deploy database servers but rather manage on top of existing ones, use existing operators for this.
 
-Build with [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder).
+## Example for PostgreSQL
 
-Work in progress.
+A `VaultBinding` binds a kubernetes vanialla secret to a vault path.
+Following a secret which fields shall be placed into vault:
 
-Name "kubedb" clashes with an open-source project: https://github.com/kubedb
-We're going to have naming "clashes" (not technical, but on human level) if we ever decide to use that one.
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-admin-credentials
+  namespace: default
+data:
+  password: MTIzNA==
+  username: MTIzNA==
+---
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: PostgreSQLDatabase
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  address: "postgres://localhost:5432"
+  rootSecret:
+    name: postgresql-admin-credentials
+---
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: PostgreSQLUser
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  database:
+    name: my-app
+  credentials:
+    name: my-app-postgresql-credentials
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-postgresql-credentials
+  namespace: default
+data:
+  password: MTIzNA==
+  username: MTIzNA==
+```
 
-TODO: Write proper README file.
+## Example for MongoDB
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-admin-credentials
+  namespace: default
+data:
+  password: MTIzNA==
+  username: MTIzNA==
+---
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: MongoDBDatabase
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  address: "mongodb://localhost:27017"
+  rootSecret:
+    name: mongodb-admin-credentials
+---
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: MongoDBUser
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  database:
+    name: my-app-mongodb-credentials
+  credentials:
+    name: my-app-mongodb
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-mongodb-credentials
+  namespace: default
+data:
+  password: MTIzNA==
+  username: MTIzNA==
+```
 
-Config options:
+## Helm chart
+
+Please see [chart/kubedb](https://github.com/DoodleScheduling/kubedb) for the helm chart docs.
+
+## Limitations
+
+Currently there is no garbage collection implemented, meaning all the things created are not removed.
+This will be at least implemented for user provisioning. Discussion will stay open for databases.
+
+## Configure the controller
 
 ENV Variable | Argument | Default value | Example | Purpose |
 -------------|----------|---------------|---------|---------|
@@ -19,8 +108,4 @@ METRICS_ADDR | --metrics-addr | :8080 | :8080 | Metrics port |
 ENABLE_LEADER_ELECTION | --enable-leader-election | false | true | Enable leader election |
 LEADER_ELECTION_NAMESPACE | --leader-election-namespace | "" | devops | Leader election namespace. Default is the same as controller.
 NAMESPACES | --namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
-MAX_CONCURRENT_RECONCILES | --max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. TODO maybe have a separate flag for each controller? |
-
-
-
-
+MAX_CONCURRENT_RECONCILES | --max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. |

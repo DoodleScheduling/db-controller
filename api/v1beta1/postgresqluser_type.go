@@ -21,25 +21,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// defaults
-const (
-	DEFAULT_MONGODB_ROOT_USER                    = "root"
-	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
-)
-
-// MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
-type MongoDBDatabaseSpec struct {
-	*DatabaseSpec `json:",inline"`
+type PostgreSQLUserSpec struct {
+	Database    *DatabaseReference `json:"database"`
+	Credentials *SecretReference   `json:"credentials"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
-func (in *MongoDBDatabase) GetStatusConditions() *[]metav1.Condition {
+func (in *PostgreSQLUser) GetStatusConditions() *[]metav1.Condition {
 	return &in.Status.Conditions
 }
 
-// MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
+// PostgreSQLUserStatus defines the observed state of PostgreSQLUser
 // IMPORTANT: Run "make" to regenerate code after modifying this file
-type MongoDBDatabaseStatus struct {
+type PostgreSQLUserStatus struct {
 	// Conditions holds the conditions for the VaultBinding.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -48,49 +42,41 @@ type MongoDBDatabaseStatus struct {
 // +genclient
 // +genclient:Namespaced
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=mdb
+// +kubebuilder:resource:shortName=pgu
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].status",description=""
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].message",description=""
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"UserReady\")].status",description=""
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"UserReady\")].message",description=""
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
-// MongoDBDatabase is the Schema for the mongodbs API
-type MongoDBDatabase struct {
+// PostgreSQLUser is the Schema for the mongodbs API
+type PostgreSQLUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MongoDBDatabaseSpec   `json:"spec,omitempty"`
-	Status MongoDBDatabaseStatus `json:"status,omitempty"`
+	Spec   PostgreSQLUserSpec   `json:"spec,omitempty"`
+	Status PostgreSQLUserStatus `json:"status,omitempty"`
 }
 
-func (in *MongoDBDatabase) GetAddress() string {
-	return in.Spec.Address
+func (in *PostgreSQLUser) GetDatabase() string {
+	return in.Spec.Database.Name
 }
 
-func (in *MongoDBDatabase) GetRootSecret() *SecretReference {
-	return in.Spec.RootSecret
-}
-
-func (in *MongoDBDatabase) GetDatabaseName() string {
-	if in.Spec.DatabaseName != "" {
-		return in.Spec.DatabaseName
-	}
-
-	return in.GetName()
+func (in *PostgreSQLUser) GetCredentials() *SecretReference {
+	return in.Spec.Credentials
 }
 
 // +kubebuilder:object:root=true
 
-// MongoDBDatabaseList contains a list of MongoDBDatabase
-type MongoDBDatabaseList struct {
+// PostgreSQLUserList contains a list of PostgreSQLUser
+type PostgreSQLUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MongoDBDatabase `json:"items"`
+	Items           []PostgreSQLUser `json:"items"`
 }
 
 // If object doesn't contain finalizer, set it and call update function 'updateF'.
 // Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
+func (d *PostgreSQLUser) SetFinalizer(updateF func() error) error {
 	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return nil
 	}
@@ -104,7 +90,7 @@ func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
 // Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
 // Call finalize function 'finalizeF', which should handle finalization logic.
 // Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
+func (d *PostgreSQLUser) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
@@ -116,14 +102,6 @@ func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error)
 	return true, nil
 }
 
-func (d *MongoDBDatabase) SetDefaults() error {
-	if d.Spec.DatabaseName == "" {
-		d.Spec.DatabaseName = d.GetName()
-	}
-
-	return nil
-}
-
 func init() {
-	SchemeBuilder.Register(&MongoDBDatabase{}, &MongoDBDatabaseList{})
+	SchemeBuilder.Register(&PostgreSQLUser{}, &PostgreSQLUserList{})
 }

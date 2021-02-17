@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"errors"
 	"github.com/doodlescheduling/kubedb/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,46 +27,32 @@ const (
 	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
 )
 
-// Finalizer
-const (
-	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
-)
-
-type PostgreSQLDatabaseRootSecretLookup struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Field     string `json:"field"`
-}
-
-type PostgreSQLDatabaseCredentials []PostgreSQLDatabaseCredential
-type PostgreSQLDatabaseCredential struct {
-	UserName string `json:"username"`
-	Vault    Vault  `json:"vault"`
-}
-
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
-// IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseSpec struct {
-	DatabaseName string `json:"databaseName"`
-	HostName     string `json:"hostName"`
-	// +optional
-	RootUsername string `json:"rootUsername"`
-	// +optional
-	RootAuthenticationDatabase string                             `json:"rootAuthDatabase"`
-	RootSecretLookup           PostgreSQLDatabaseRootSecretLookup `json:"rootSecretLookup"`
-	Credentials                PostgreSQLDatabaseCredentials      `json:"credentials"`
+	*DatabaseSpec `json:",inline"`
+}
+
+// GetStatusConditions returns a pointer to the Status.Conditions slice
+func (in *PostgreSQLDatabase) GetStatusConditions() *[]metav1.Condition {
+	return &in.Status.Conditions
 }
 
 // PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseStatus struct {
-	DatabaseStatus    DatabaseStatus    `json:"database"`
-	CredentialsStatus CredentialsStatus `json:"credentials"`
-	LastUpdateTime    *metav1.Time      `json:"lastUpdateTime"`
+	// Conditions holds the conditions for the VaultBinding.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +genclient
+// +genclient:Namespaced
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=pgd
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].status",description=""
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"DatabaseReady\")].message",description=""
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
 // PostgreSQLDatabase is the Schema for the postgresqls API
 type PostgreSQLDatabase struct {
@@ -76,6 +61,22 @@ type PostgreSQLDatabase struct {
 
 	Spec   PostgreSQLDatabaseSpec   `json:"spec,omitempty"`
 	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
+}
+
+func (in *PostgreSQLDatabase) GetAddress() string {
+	return in.Spec.Address
+}
+
+func (in *PostgreSQLDatabase) GetRootSecret() *SecretReference {
+	return in.Spec.RootSecret
+}
+
+func (in *PostgreSQLDatabase) GetDatabaseName() string {
+	if in.Spec.DatabaseName != "" {
+		return in.Spec.DatabaseName
+	}
+
+	return in.GetName()
 }
 
 // +kubebuilder:object:root=true
@@ -87,85 +88,39 @@ type PostgreSQLDatabaseList struct {
 	Items           []PostgreSQLDatabase `json:"items"`
 }
 
-/*
-	Alignes credentials status with spec by removing unneeded statuses. Mutates the original.
-	Returns removed statuses.
-*/
-func (d *PostgreSQLDatabase) RemoveUnneededCredentialsStatus() *CredentialsStatus {
-	removedStatuses := make(CredentialsStatus, 0)
-	statuses := &d.Status.CredentialsStatus
-	for i := 0; i < len(*statuses); i++ {
-		status := (*statuses)[i]
-		found := false
-		if status != nil {
-			for _, credential := range d.Spec.Credentials {
-				if credential.UserName == status.Username {
-					found = true
-				}
-			}
-		}
-		if !found {
-			removedStatuses = append(removedStatuses, status)
-			s := append((*statuses)[:i], (*statuses)[i+1:]...)
-			statuses = &s
-			i--
-		}
-	}
-	d.Status.CredentialsStatus = *statuses
-	return &removedStatuses
-}
-
-/*
-	If object doesn't contain finalizer, set it and call update function 'updateF'.
-	Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-*/
+// If object doesn't contain finalizer, set it and call update function 'updateF'.
+// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
 func (d *PostgreSQLDatabase) SetFinalizer(updateF func() error) error {
 	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return nil
 	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
+		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
 		return updateF()
 	}
 	return nil
 }
 
-/*
-	Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-	Call finalize function 'finalizeF', which should handle finalization logic.
-	Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-*/
+// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
+// Call finalize function 'finalizeF', which should handle finalization logic.
+// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
 func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer) {
+	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
 		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, PostgreSQLDatabaseControllerFinalizer)
+		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
 		return true, updateF()
 	}
 	return true, nil
 }
 
 func (d *PostgreSQLDatabase) SetDefaults() error {
-	if d.Spec.RootUsername == "" {
-		d.Spec.RootUsername = DEFAULT_POSTGRESQL_ROOT_USER
+	if d.Spec.DatabaseName == "" {
+		d.Spec.DatabaseName = d.GetName()
 	}
-	if d.Spec.RootAuthenticationDatabase == "" {
-		d.Spec.RootAuthenticationDatabase = DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE
-	}
-	if d.Spec.RootSecretLookup.Name == "" {
-		return errors.New("must specify root secret")
-	}
-	if d.Spec.RootSecretLookup.Field == "" {
-		return errors.New("must specify root secret field")
-	}
-	if d.Spec.RootSecretLookup.Namespace == "" {
-		d.Spec.RootSecretLookup.Namespace = d.ObjectMeta.Namespace
-	}
-	if d.Status.CredentialsStatus == nil || len(d.Status.CredentialsStatus) == 0 {
-		d.Status.CredentialsStatus = make([]*CredentialStatus, 0)
-	}
+
 	return nil
 }
 

@@ -18,44 +18,86 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+
 	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	"github.com/doodlescheduling/kubedb/common"
-	postgresqlAPI "github.com/doodlescheduling/kubedb/common/db/postgresql"
+	"github.com/doodlescheduling/kubedb/common/db"
 	"github.com/go-logr/logr"
+	"github.com/prometheus/common/log"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-)
-
-const (
-	PostgreSQLDatabaseControllerFinalizer = "infra.finalizers.doodle.com"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
 type PostgreSQLDatabaseReconciler struct {
 	client.Client
-	Log         logr.Logger
-	Scheme      *runtime.Scheme
-	ServerCache *postgresqlAPI.Cache
-	VaultCache  *common.Cache
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Recorder   record.EventRecorder
+	ClientPool *db.ClientPool
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=postgresqldatabases/status,verbs=get;update;patch
+func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+	// Index the PostgreSQLDatabase by the Secret references they point at
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.PostgreSQLDatabase{}, secretIndexKey,
+		func(o client.Object) []string {
+			vb := o.(*infrav1beta1.PostgreSQLDatabase)
+			return []string{
+				fmt.Sprintf("%s/%s", vb.GetNamespace(), vb.Spec.RootSecret.Name),
+			}
+		},
+	); err != nil {
+		return err
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&infrav1beta1.PostgreSQLDatabase{}).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
+		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
+		Complete(r)
+}
+
+func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+	s, ok := o.(*corev1.Secret)
+	if !ok {
+		panic(fmt.Sprintf("expected a Secret, got %T", o))
+	}
+
+	ctx := context.Background()
+	var list infrav1beta1.PostgreSQLDatabaseList
+	if err := r.List(ctx, &list, client.MatchingFields{
+		secretIndexKey: objectKey(s).String(),
+	}); err != nil {
+		return nil
+	}
+
+	var reqs []reconcile.Request
+	for _, i := range list.Items {
+		r.Log.Info("referenced secret from a PostgreSQLDatabase changed detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
+	}
+
+	return reqs
+}
+
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	log := r.Log.WithValues("postgresqldatabase", req.NamespacedName)
-
-	// common controller functions
-	cw := NewControllerWrapper(*r, &ctx)
-	// garbage collector
-	gc := NewPostgreSQLGarbageCollector(r, cw, &log)
+func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := r.Log.WithValues("PostgreSQLDatabase", req.NamespacedName)
+	logger.Info("reconciling PostgreSQLDatabase")
 
 	// get database resource by namespaced name
 	var database infrav1beta1.PostgreSQLDatabase
@@ -66,6 +108,8 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		}
 		return ctrl.Result{}, err
 	}
+
+	database.SetDefaults()
 
 	// set finalizer
 	if err := database.SetFinalizer(func() error {
@@ -78,115 +122,31 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	if finalized, err := database.Finalize(func() error {
 		return r.Update(ctx, &database)
 	}, func() error {
-		return gc.CleanFromSpec(&database)
+		return nil
+		//return gc.CleanFromSpec(&database)
 	}); err != nil {
 		return reconcile.Result{}, err
 	} else if finalized {
 		return reconcile.Result{}, nil
 	}
 
-	// set spec defaults. Does not mutate the spec, since we are not updating resource
-	if err := database.SetDefaults(); err != nil {
-		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &database, &log)
+	_, result, reconcileErr := reconcileDatabase(ctx, r.Client, r.ClientPool, db.NewPostgreSQLServer, &database, logger, r.Recorder)
+
+	// Update status after reconciliation.
+	if err := r.patchStatus(ctx, &database); err != nil {
+		log.Error(err, "unable to update status after reconciliation")
+		return ctrl.Result{Requeue: true}, err
 	}
 
-	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	if err := gc.CleanFromStatus(&database); err != nil {
-		log.Info("Error while cleaning garbage", "error", err)
-	}
-
-	// get root database password from k8s secret
-	rootPassword, err := cw.GetRootPassword(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
-	if err != nil {
-		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", "")
-		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &database, &log)
-	}
-
-	// database connection to spec host, cached
-	postgreSQLServer, err := r.ServerCache.Get(database.Spec.HostName, database.Spec.RootUsername, rootPassword, database.Spec.RootAuthenticationDatabase)
-	if err != nil {
-		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
-			WithUsername(database.Spec.RootUsername).
-			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
-		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &database, &log)
-	}
-
-	// vault connection, cached
-	//vault, err := r.VaultCache.Get(database.Spec.RootSecretLookup.Name)
-	if err != nil {
-		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
-			WithUsername(database.Spec.RootUsername).
-			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
-		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		return r.updateAndReturn(&ctx, &database, &log)
-	}
-
-	// Setup database
-	if err := postgreSQLServer.CreateDatabaseIfNotExists(database.Spec.DatabaseName); err != nil {
-		database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Unavailable, err.Error(), "", database.Spec.HostName).
-			WithUsername(database.Spec.RootUsername).
-			WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
-			WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
-		database.Status.CredentialsStatus = make(infrav1beta1.CredentialsStatus, 0)
-		r.ServerCache.Remove(database.Spec.HostName)
-		return r.updateAndReturn(&ctx, &database, &log)
-	}
-	database.Status.DatabaseStatus.SetDatabaseStatus(infrav1beta1.Available, "Database up.", database.Spec.DatabaseName, database.Spec.HostName).
-		WithUsername(database.Spec.RootUsername).
-		WithAuthDatabase(database.Spec.RootAuthenticationDatabase).
-		WithRootSecretLookup(database.Spec.RootSecretLookup.Name, database.Spec.RootSecretLookup.Namespace, database.Spec.RootSecretLookup.Field)
-
-	// setup credentials as per spec
-	for _, credential := range database.Spec.Credentials {
-		username := credential.UserName
-		postgreSQLCredentialStatus := database.Status.CredentialsStatus.FindOrCreate(username, func(status *infrav1beta1.CredentialStatus) bool {
-			return status != nil && status.Username == username
-		})
-		// get user credentials from vault
-		vault := common.Vault{}
-		vaultResponse, err := vault.Get(common.ConvertPostgreSQLDatabaseCredential(credential), username, log)
-		if err != nil {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
-			continue
-		}
-		password := vaultResponse.Secret
-
-		// setup user credentials and privileges
-		if err := postgreSQLServer.SetupUser(database.Spec.DatabaseName, username, password); err != nil {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Unavailable, err.Error())
-		} else {
-			postgreSQLCredentialStatus.SetCredentialsStatus(infrav1beta1.Available, "Credentials up.")
-		}
-	}
-
-	return r.updateAndReturn(&ctx, &database, &log)
+	return result, reconcileErr
 }
 
-func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.PostgreSQLDatabase{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: maxConcurrentReconciles,
-		}).Complete(r)
-}
-
-func (r *PostgreSQLDatabaseReconciler) updateAndReturn(ctx *context.Context, database *infrav1beta1.PostgreSQLDatabase, log *logr.Logger) (ctrl.Result, error) {
-	now := metav1.Now()
-	database.Status.LastUpdateTime = &now
-	if err := r.Status().Update(*ctx, database); err != nil {
-		if apierrors.IsConflict(err) {
-			return ctrl.Result{
-				Requeue: true,
-			}, nil
-		}
-		(*log).Error(err, "unable to update PostgreSQLDatabase status")
-		return ctrl.Result{}, err
+func (r *PostgreSQLDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLDatabase) error {
+	key := client.ObjectKeyFromObject(database)
+	latest := &infrav1beta1.PostgreSQLDatabase{}
+	if err := r.Client.Get(ctx, key, latest); err != nil {
+		return err
 	}
-	return ctrl.Result{}, nil
+
+	return r.Client.Status().Patch(ctx, database, client.MergeFrom(latest))
 }

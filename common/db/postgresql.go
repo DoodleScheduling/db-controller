@@ -1,42 +1,40 @@
-package postgresql
+package db
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type PostgreSQLServer struct {
-	dbpool       *pgxpool.Pool
-	Host         string
-	RootUser     string
-	RootPassword string
-	RootDatabase string
+	dbpool *pgxpool.Pool
 }
 
-func getPostgreSQLConnectionURI(host string, rootUser string, rootPassword string, rootDatabase string) string {
-	// alternative dsn string: "host=%s port=%s user=%s password=%s dbname=%s"
-	return fmt.Sprintf("postgresql://%s:%s@%s/%s", rootUser, rootPassword, host, rootDatabase)
-}
-
-func NewPostgreSQLServer(host string, rootUser string, rootPassword string, rootDatabase string) (*PostgreSQLServer, error) {
-	dbpool, err := pgxpool.Connect(context.Background(), getPostgreSQLConnectionURI(host, rootUser, rootPassword, rootDatabase))
+func NewPostgreSQLServer(ctx context.Context, uri, username, password string) (Handler, error) {
+	opt, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
+
+	opt.User = url.UserPassword(username, password)
+	dbpool, err := pgxpool.Connect(context.Background(), opt.String())
+	if err != nil {
+		return nil, err
+
+	}
+
 	return &PostgreSQLServer{
-		dbpool:       dbpool,
-		Host:         host,
-		RootUser:     rootUser,
-		RootPassword: rootPassword,
-		RootDatabase: rootDatabase,
+		dbpool: dbpool,
 	}, nil
 }
 
-func (s *PostgreSQLServer) Close() {
+func (s *PostgreSQLServer) Close() error {
 	s.dbpool.Close()
+	return nil
 }
 
 // TODO Prepared Statements

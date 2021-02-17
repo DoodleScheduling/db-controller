@@ -1,10 +1,16 @@
 domain: doodle.com
 repo: github.com/doodlescheduling/kubedb
 resources:
-- group: infra
-  kind: MongoDB
+- group: dbprovisioning.infra.doodle.com
+  kind: MongoDBDatabase
   version: v1beta1
-- group: infra
-  kind: PostgreSQL
+- group: dbprovisioning.infra.doodle.com
+  kind: PostgreSQLDatabase
+  version: v1beta1
+- group: dbprovisioning.infra.doodle.com
+  kind: MongoDBUser
+  version: v1beta1
+- group: dbprovisioning.infra.doodle.com
+  kind: PostgreSQLUser
   version: v1beta1
 version: "2"

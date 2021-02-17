@@ -17,6 +17,66 @@ rules:
 - apiGroups:
   - infra.doodle.com
   resources:
+  - MongoDBUsers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - MongoDBUsers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLUsers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLUsers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLdatabases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infra.doodle.com
+  resources:
+  - PostgreSQLdatabases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infra.doodle.com
+  resources:
   - mongodbdatabases
   verbs:
   - create
@@ -30,26 +90,6 @@ rules:
   - infra.doodle.com
   resources:
   - mongodbdatabases/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - postgresqldatabases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - postgresqldatabases/status
   verbs:
   - get
   - patch
