@@ -5,9 +5,6 @@ Kubernetes Controller that deals with database and user provisioning.
 
 ## Example for PostgreSQL
 
-A `VaultBinding` binds a kubernetes vanialla secret to a vault path.
-Following a secret which fields shall be placed into vault:
-
 ```yaml
 apiVersion: v1
 kind: Secret
