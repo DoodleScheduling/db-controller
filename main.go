@@ -132,8 +132,6 @@ func main() {
 		setupLog.Info("Starting profiler...")
 		if err := http.ListenAndServe(profilerAddr, nil); err != nil {
 			setupLog.Error(err, "Profiler failed to start")
-		} else {
-			setupLog.Info("Profiler started")
 		}
 	}()
 
