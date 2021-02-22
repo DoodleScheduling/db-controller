@@ -51,6 +51,7 @@ var (
 const (
 	MetricAddr              = "metrics-addr"
 	ProbeAddr               = "probe-addr"
+	ProfilerAddr            = "profiler-addr"
 	EnableLeaderElection    = "enable-leader-election"
 	LeaderElectionNamespace = "leader-election-namespace"
 	Namespaces              = "namespaces"
@@ -61,6 +62,7 @@ const (
 var (
 	metricsAddr             = ":8080"
 	probesAddr              = ":9558"
+	profilerAddr            = ":6060"
 	enableLeaderElection    = false
 	leaderElectionNamespace = ""
 	namespacesConfig        = ""
@@ -77,6 +79,7 @@ func init() {
 func main() {
 	flag.StringVar(&metricsAddr, MetricAddr, ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probesAddr, ProbeAddr, ":9558", "The address of the probe endpoints bind to.")
+	flag.StringVar(&profilerAddr, ProfilerAddr, ":6060", "The address of the profiler endpoints bind to.")
 	flag.BoolVar(&enableLeaderElection, EnableLeaderElection, false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -103,6 +106,7 @@ func main() {
 	probesAddr = viper.GetString(ProbeAddr)
 	namespacesConfig = viper.GetString(Namespaces)
 	maxConcurrentReconciles = viper.GetInt(MaxConcurrentReconciles)
+	profilerAddr = viper.GetString(ProfilerAddr)
 
 	namespaces := strings.Split(namespacesConfig, ",")
 	options := ctrl.Options{
@@ -123,9 +127,10 @@ func main() {
 		options.LeaderElectionNamespace = leaderElectionNamespace
 	}
 
+	// Profiler
 	go func() {
-		setupLog.Info("Starting profiler..")
-		if err := http.ListenAndServe(":6060", nil); err != nil {
+		setupLog.Info("Starting profiler...")
+		if err := http.ListenAndServe(profilerAddr, nil); err != nil {
 			setupLog.Error(err, "Profiler failed to start")
 		} else {
 			setupLog.Info("Profiler started")
