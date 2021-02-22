@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -194,4 +196,8 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
 }
