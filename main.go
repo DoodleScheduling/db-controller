@@ -198,6 +198,11 @@ func main() {
 	}
 
 	go func() {
-		http.ListenAndServe(":6060", nil)
+		setupLog.Info("Starting profiler..")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			setupLog.Error(err, "Profiler failed to start")
+		} else {
+			setupLog.Info("Profiler started")
+		}
 	}()
 }
