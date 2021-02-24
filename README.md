@@ -92,6 +92,14 @@ data:
 
 Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller) for the helm chart docs.
 
+## Profiling
+To profile controller, access web server on #profilerPort (default 6060). 
+
+In Kubernetes, port-forward to this port, and open the `/debug/pprof` URL in browser. For example, if you port-forward 6060 from container to 6060 on your machine, access:
+```
+http://localhost:6060/debug/pprof/
+```
+
 ## Limitations
 
 Currently there is no garbage collection implemented, meaning all the things created are not removed.

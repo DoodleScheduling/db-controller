@@ -60,6 +60,9 @@ spec:
         - name: probes
           containerPort: {{ .Values.probesPort }}
           protocol: TCP
+        - name: profiler
+          containerPort: {{ .Values.profilerPort }}
+          protocol: TCP
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 10 }}
         readinessProbe:

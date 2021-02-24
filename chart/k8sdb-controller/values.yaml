@@ -39,6 +39,7 @@ podAnnotations: {}
 
 metricsPort: "8080"
 probesPort: "9558"
+profilerPort: "6060"
 
 # Change the metrics path
 metricsPath: /metrics
