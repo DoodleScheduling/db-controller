@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/doodlescheduling/kubedb/common/stringutils"
+	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

@@ -1,23 +1,25 @@
+{{- if .Values.clusterRBAC.enabled -}}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: {{ template "kubedb.fullname" . }}
+  name: {{ template "k8sdb-controller.fullname" . }}
   labels:
-    app.kubernetes.io/name: {{ include "kubedb.name" . }}
+    app.kubernetes.io/name: {{ include "k8sdb-controller.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    helm.sh/chart: {{ include "kubedb.chart" . }}
+    helm.sh/chart: {{ include "k8sdb-controller.chart" . }}
   annotations:
     {{- toYaml .Values.annotations | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ template "kubedb.fullname" . }}
+  kind: ClusterRole
+  name: {{ template "k8sdb-controller.fullname" . }}
 subjects:
 - kind: ServiceAccount
   {{- if .Values.serviceAccount.create  }}
-  name: {{ template "kubedb.fullname" . }}
+  name: {{ template "k8sdb-controller.fullname" . }}
   {{- else }}
   name: {{ .Values.serviceAccount.name }}
   {{- end }}
   namespace: {{ .Release.Namespace }}
+{{- end }}

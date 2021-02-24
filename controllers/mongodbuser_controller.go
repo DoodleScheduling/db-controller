@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	"github.com/doodlescheduling/kubedb/common/db"
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/db"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"

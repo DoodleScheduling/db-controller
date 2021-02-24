@@ -1,16 +1,16 @@
-# kubedb helm chart
+# k8sdb-controller helm chart
 
-Installs the [kubedb](https://github.com/DoodleScheduling/kubedb).
+Installs the [k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller).
 
 ## Installing the Chart
 
-To install the chart with the release name `kubedb`:
+To install the chart with the release name `k8sdb-controller`:
 
 ```console
-helm upgrade --install kubedb chart/kubedb
+helm upgrade --install k8sdb-controller chart/k8sdb-controller
 ```
 
-This command deploys the kubedb with the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
+This command deploys the k8sdb-controller with the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
 
 ## Using the Chart
 
@@ -30,5 +30,5 @@ podAnnotations:
 See Customizing the Chart Before Installing. To see all configurable options with detailed comments, visit the chart's values.yaml, or run the configuration command:
 
 ```sh
-$ helm show values kubedb/kubedb
+$ helm show values k8sdb-controller/k8sdb-controller
 ```

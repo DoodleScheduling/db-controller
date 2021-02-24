@@ -34,9 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
-	"github.com/doodlescheduling/kubedb/common/db"
-	"github.com/doodlescheduling/kubedb/controllers"
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/db"
+	"github.com/doodlescheduling/k8sdb-controller/controllers"
 	// +kubebuilder:scaffold:imports
 )
 

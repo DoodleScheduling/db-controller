@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
-	infrav1beta1 "github.com/doodlescheduling/kubedb/api/v1beta1"
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
 

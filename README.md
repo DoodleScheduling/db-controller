@@ -90,7 +90,7 @@ data:
 
 ## Helm chart
 
-Please see [chart/kubedb](https://github.com/DoodleScheduling/kubedb) for the helm chart docs.
+Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller) for the helm chart docs.
 
 ## Limitations
 

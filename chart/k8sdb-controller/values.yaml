@@ -8,7 +8,7 @@ fullnameOverride: ""
 
 image:
   pullPolicy: IfNotPresent
-  repository: nexus.doodle.com:5000/devops/kubedb
+  repository: nexus.doodle.com:5000/devops/k8sdb-controller
   tag: 0.0.0
 
 imagePullSecrets: []

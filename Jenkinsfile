@@ -1,7 +1,7 @@
 import java.util.regex.Pattern
 import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
 
-podTemplate(label: 'kubedb',
+podTemplate(label: 'k8sdb-controller',
   containers: [
     containerTemplate(
       name: 'golang',
@@ -24,7 +24,7 @@ podTemplate(label: 'kubedb',
     hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'),
   ]
 ) {
-  node ('kubedb') {
+  node ('k8sdb-controller') {
     ansiColor("xterm") {
       stage('checkout') {
         checkout(scm)
@@ -40,7 +40,7 @@ podTemplate(label: 'kubedb',
         }
 
         container('helm') {
-          sh 'helm lint chart/kubedb'
+          sh 'helm lint chart/k8sdb-controller'
         }
       }
 
@@ -57,17 +57,17 @@ podTemplate(label: 'kubedb',
           version = "$major.$minor.$patch$group"
 
           container('docker') {
-            sh "docker build . -t nexus.doodle.com:5000/devops/kubedb:${env.TAG_NAME}"
-            sh "docker push nexus.doodle.com:5000/devops/kubedb:${env.TAG_NAME}"
+            sh "docker build . -t nexus.doodle.com:5000/devops/k8sdb-controller:${env.TAG_NAME}"
+            sh "docker push nexus.doodle.com:5000/devops/k8sdb-controller:${env.TAG_NAME}"
           }
 
           container('helm') {
             bumpChartVersion(version)
             bumpImageVersion(env.TAG_NAME)
 
-            tgz="kubedb-${version}.tgz"
-            sh "cp config/crd/bases/* chart/kubedb/crds"
-            sh "helm package chart/kubedb"
+            tgz="k8sdb-controller-${version}.tgz"
+            sh "cp config/crd/bases/* chart/k8sdb-controller/crds"
+            sh "helm package chart/k8sdb-controller"
           }
 
           container('golang') {
@@ -108,7 +108,7 @@ void dockerAuth() {
 
 def bumpImageVersion(String version) {
   echo "Update image tag"
-  def valuesFile = "./chart/kubedb/values.yaml"
+  def valuesFile = "./chart/k8sdb-controller/values.yaml"
   def valuesData = readYaml file: valuesFile
   valuesData.image.tag = version
 
@@ -119,7 +119,7 @@ def bumpImageVersion(String version) {
 def bumpChartVersion(String version) {
   // Bump chart version
   echo "Update chart version"
-  def chartFile = "./chart/kubedb/Chart.yaml"
+  def chartFile = "./chart/k8sdb-controller/Chart.yaml"
   def chartData = readYaml file: chartFile
   chartData.version = version
   chartData.appVersion = version

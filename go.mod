@@ -1,4 +1,4 @@
-module github.com/doodlescheduling/kubedb
+module github.com/doodlescheduling/k8sdb-controller
 
 go 1.13
 
