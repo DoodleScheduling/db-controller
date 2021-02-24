@@ -8,7 +8,6 @@ import (
 	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	"github.com/doodlescheduling/k8sdb-controller/common/db"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,7 +70,7 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	return user, pw, nil
 }
 
-func reconcileDatabase(ctx context.Context, c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, logger logr.Logger, recorder record.EventRecorder) (database, ctrl.Result, error) {
+func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result, error) {
 	// Fetch referencing root secret
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
@@ -85,7 +84,7 @@ func reconcileDatabase(ctx context.Context, c client.Client, pool *db.ClientPool
 		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, v1beta1.SecretNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
+		return database, ctrl.Result{Requeue: true}, nil
 	}
 
 	usr, pw, err := extractCredentials(database.GetRootSecret(), secret)
@@ -94,7 +93,7 @@ func reconcileDatabase(ctx context.Context, c client.Client, pool *db.ClientPool
 		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CredentialsNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
+		return database, ctrl.Result{Requeue: true}, nil
 	}
 
 	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), usr, pw)
@@ -102,7 +101,7 @@ func reconcileDatabase(ctx context.Context, c client.Client, pool *db.ClientPool
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.ConnectionFailedReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
+		return database, ctrl.Result{Requeue: true}, nil
 	}
 
 	err = dbHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
@@ -110,16 +109,16 @@ func reconcileDatabase(ctx context.Context, c client.Client, pool *db.ClientPool
 		msg := fmt.Sprintf("Failed to provision database: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
-		return database, ctrl.Result{Requeue: true}, err
+		return database, ctrl.Result{Requeue: true}, nil
 	}
 
 	msg := "Database successfully provisioned"
 	recorder.Event(database, "Normal", "info", msg)
 	v1beta1.DatabaseReadyCondition(database, v1beta1.DatabaseProvisiningSuccessfulReason, msg)
-	return database, ctrl.Result{}, err
+	return database, ctrl.Result{}, nil
 }
 
-func reconcileUser(ctx context.Context, database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, logger logr.Logger, recorder record.EventRecorder) (user, ctrl.Result, error) {
+func reconcileUser(database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result, error) {
 	// Fetch referencing database
 	databaseName := types.NamespacedName{
 		Namespace: user.GetNamespace(),

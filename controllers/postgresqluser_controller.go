@@ -177,7 +177,7 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}*/
 
 	var database infrav1beta1.PostgreSQLDatabase
-	_, result, reconcileErr := reconcileUser(ctx, &database, r.Client, r.ClientPool, db.NewPostgreSQLServer, &user, logger, r.Recorder)
+	_, result, reconcileErr := reconcileUser(&database, r.Client, r.ClientPool, db.NewPostgreSQLServer, &user, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
