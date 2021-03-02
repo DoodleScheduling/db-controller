@@ -13,4 +13,5 @@ type Handler interface {
 	SetupUser(database string, username string, password string) error
 	DropUser(database string, username string) error
 	CreateDatabaseIfNotExists(database string) error
+	EnableExtension(name string) error
 }

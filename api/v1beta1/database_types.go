@@ -42,6 +42,10 @@ type DatabaseSpec struct {
 	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
+
+	// Database extensions
+	// +optional
+	Extensions Extensions `json:"extensions"`
 }
 
 // DatabaseReference is a named reference to a database kind
@@ -65,6 +69,14 @@ type SecretReference struct {
 	// +kubebuilder:default:=password
 	PasswordField string `json:"passwordField"`
 }
+
+// Extension is a resource representing database extension
+type Extension struct {
+	Name string `json:"name"`
+}
+
+// Extensions is a collection of Extension types
+type Extensions []Extension
 
 // conditionalResource is a resource with conditions
 type conditionalResource interface {

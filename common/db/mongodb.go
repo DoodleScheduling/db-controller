@@ -91,6 +91,20 @@ func (m *MongoDBServer) SetupUser(database string, username string, password str
 	return nil
 }
 
+func (m *MongoDBServer) DropUser(database string, username string) error {
+	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
+	r := m.runCommand(database, command)
+	if _, err := r.DecodeBytes(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MongoDBServer) EnableExtension(name string) error {
+	// NOOP
+	return nil
+}
+
 func (m *MongoDBServer) doesUserExist(database string, username string) (bool, error) {
 	users, err := m.getAllUsers(database, username)
 	if err != nil {
@@ -137,15 +151,6 @@ func (m *MongoDBServer) createUser(database string, username string, password st
 func (m *MongoDBServer) updateUserPasswordAndRoles(database string, username string, password string) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: []bson.M{{"role": "readWrite", "db": database}}}}
-	r := m.runCommand(database, command)
-	if _, err := r.DecodeBytes(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *MongoDBServer) DropUser(database string, username string) error {
-	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
 	r := m.runCommand(database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err

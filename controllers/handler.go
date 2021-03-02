@@ -31,6 +31,7 @@ type database interface {
 	GetRootSecret() *infrav1beta1.SecretReference
 	GetAddress() string
 	GetDatabaseName() string
+	GetExtensions() infrav1beta1.Extensions
 }
 
 type user interface {
@@ -110,6 +111,15 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
 		return database, ctrl.Result{Requeue: true}, nil
+	}
+
+	for _, extension := range database.GetExtensions() {
+		if err := dbHandler.EnableExtension(extension.Name); err != nil {
+			msg := fmt.Sprintf("Failed to create extension %s in database: %s", extension.Name, err.Error())
+			recorder.Event(database, "Normal", "error", msg)
+			infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
+			return database, ctrl.Result{Requeue: true}, nil
+		}
 	}
 
 	msg := "Database successfully provisioned"
