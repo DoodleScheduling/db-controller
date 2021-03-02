@@ -31,6 +31,7 @@ type database interface {
 	GetRootSecret() *infrav1beta1.SecretReference
 	GetAddress() string
 	GetDatabaseName() string
+	GetRootDatabaseName() string
 	GetExtensions() infrav1beta1.Extensions
 }
 
@@ -97,7 +98,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}, nil
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), usr, pw)
+	rootDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -105,7 +106,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}, nil
 	}
 
-	err = dbHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
+	err = rootDBHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provision database: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -113,8 +114,15 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}, nil
 	}
 
+	targetDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetDatabaseName(), usr, pw)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
+		recorder.Event(database, "Normal", "error", msg)
+		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.ConnectionFailedReason, msg)
+		return database, ctrl.Result{Requeue: true}, nil
+	}
 	for _, extension := range database.GetExtensions() {
-		if err := dbHandler.EnableExtension(extension.Name); err != nil {
+		if err := targetDBHandler.EnableExtension(extension.Name); err != nil {
 			msg := fmt.Sprintf("Failed to create extension %s in database: %s", extension.Name, err.Error())
 			recorder.Event(database, "Normal", "error", msg)
 			infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
@@ -169,7 +177,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		return user, ctrl.Result{Requeue: true}, nil
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), usr, pw)
+	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())

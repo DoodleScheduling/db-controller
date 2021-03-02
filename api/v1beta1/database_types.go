@@ -45,7 +45,7 @@ type DatabaseSpec struct {
 
 	// Database extensions
 	// +optional
-	Extensions Extensions `json:"extensions"`
+	Extensions Extensions `json:"extensions,omitempty"`
 }
 
 // DatabaseReference is a named reference to a database kind

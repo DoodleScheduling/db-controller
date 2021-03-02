@@ -73,6 +73,10 @@ func (in *PostgreSQLDatabase) GetDatabaseName() string {
 	return in.GetName()
 }
 
+func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
+	return ""
+}
+
 func (in *PostgreSQLDatabase) GetExtensions() Extensions {
 	return in.Spec.Extensions
 }

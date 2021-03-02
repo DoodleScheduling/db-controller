@@ -73,6 +73,10 @@ func (in *MongoDBDatabase) GetDatabaseName() string {
 	return in.GetName()
 }
 
+func (in *MongoDBDatabase) GetRootDatabaseName() string {
+	return ""
+}
+
 func (in *MongoDBDatabase) GetExtensions() Extensions {
 	return in.Spec.Extensions
 }
