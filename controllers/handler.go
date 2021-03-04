@@ -125,7 +125,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		if err := targetDBHandler.EnableExtension(extension.Name); err != nil {
 			msg := fmt.Sprintf("Failed to create extension %s in database: %s", extension.Name, err.Error())
 			recorder.Event(database, "Normal", "error", msg)
-			infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
+			infrav1beta1.ExtensionNotReadyCondition(database, infrav1beta1.CreateExtensionFailedReason, msg)
 			return database, ctrl.Result{Requeue: true}, nil
 		}
 	}

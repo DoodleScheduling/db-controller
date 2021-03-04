@@ -12,8 +12,9 @@ const (
 
 // Status conditions
 const (
-	DatabaseReadyConditionType = "DatabaseReady"
-	UserReadyConditionType     = "UserReady"
+	DatabaseReadyConditionType  = "DatabaseReady"
+	UserReadyConditionType      = "UserReady"
+	ExtensionReadyConditionType = "ExtensionReady"
 )
 
 // Status reasons
@@ -27,6 +28,7 @@ const (
 	UserProvisioningSuccessfulReason    = "UserProvisioningSuccessful"
 	CredentialsNotFoundReason           = "CredentialsNotFound"
 	CreateDatabaseFailedReason          = "CreateDatabaseFailed"
+	CreateExtensionFailedReason         = "CreateExtensionFailed"
 )
 
 // DatabaseSpec defines the desired state of MongoDBDatabase
@@ -89,6 +91,10 @@ func DatabaseNotReadyCondition(in conditionalResource, reason, message string) {
 
 func DatabaseReadyCondition(in conditionalResource, reason, message string) {
 	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionTrue, reason, message)
+}
+
+func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func UserNotReadyCondition(in conditionalResource, reason, message string) {
