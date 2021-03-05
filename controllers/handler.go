@@ -130,7 +130,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 	if err != nil {
 		msg := fmt.Sprintf("Referencing database was not found: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(user, v1beta1.DatabaseNotFoundReason, msg)
+		infrav1beta1.UserNotReadyCondition(user, v1beta1.DatabaseNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, nil
 	}
 
@@ -146,7 +146,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 	if err != nil {
 		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(user, v1beta1.SecretNotFoundReason, msg)
+		infrav1beta1.UserNotReadyCondition(user, v1beta1.SecretNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, nil
 	}
 
@@ -155,7 +155,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 	if err != nil {
 		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(user, infrav1beta1.CredentialsNotFoundReason, msg)
+		infrav1beta1.UserNotReadyCondition(user, infrav1beta1.CredentialsNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}, nil
 	}
 
@@ -164,7 +164,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
-		infrav1beta1.DatabaseNotReadyCondition(user, infrav1beta1.ConnectionFailedReason, msg)
+		infrav1beta1.UserNotReadyCondition(user, infrav1beta1.ConnectionFailedReason, msg)
 		return user, ctrl.Result{Requeue: true}, nil
 	}
 
