@@ -130,7 +130,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return reconcile.Result{}, nil
 	}
 
-	_, result, reconcileErr := reconcileDatabase(r.Client, r.ClientPool, db.NewMongoDBRepository, &database, r.Recorder)
+	_, result := reconcileDatabase(r.Client, r.ClientPool, db.NewMongoDBRepository, &database, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &database); err != nil {
@@ -138,7 +138,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return result, reconcileErr
+	return result, nil
 }
 
 func (r *MongoDBDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.MongoDBDatabase) error {
