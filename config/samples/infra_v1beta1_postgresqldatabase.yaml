@@ -8,6 +8,8 @@ spec:
   rootSecret:
     name: postgresql
     passwordField: "postgresql-password"
+  extensions:
+    - name: pg_trgm
 ---
 apiVersion: dbprovisioning.infra.doodle.com/v1beta1
 kind: PostgreSQLUser

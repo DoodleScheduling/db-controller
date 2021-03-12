@@ -54,6 +54,17 @@ spec:
               databaseName:
                 description: DatabaseName is by default the same as metata.name
                 type: string
+              extensions:
+                description: Database extensions
+                items:
+                  description: Extension is a resource representing database extension
+                  properties:
+                    name:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               rootSecret:
                 description: Contains a credentials set of a user with enough permission
                   to manage databases and user accounts

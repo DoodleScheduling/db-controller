@@ -31,6 +31,8 @@ type database interface {
 	GetRootSecret() *infrav1beta1.SecretReference
 	GetAddress() string
 	GetDatabaseName() string
+	GetRootDatabaseName() string
+	GetExtensions() infrav1beta1.Extensions
 }
 
 type user interface {
@@ -70,7 +72,7 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	return user, pw, nil
 }
 
-func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result, error) {
+func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
 	// Fetch referencing root secret
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
@@ -84,7 +86,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, v1beta1.SecretNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, nil
+		return database, ctrl.Result{Requeue: true}
 	}
 
 	usr, pw, err := extractCredentials(database.GetRootSecret(), secret)
@@ -93,32 +95,48 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CredentialsNotFoundReason, msg)
-		return database, ctrl.Result{Requeue: true}, nil
+		return database, ctrl.Result{Requeue: true}
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), usr, pw)
+	rootDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.ConnectionFailedReason, msg)
-		return database, ctrl.Result{Requeue: true}, nil
+		return database, ctrl.Result{Requeue: true}
 	}
 
-	err = dbHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
+	err = rootDBHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provision database: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.CreateDatabaseFailedReason, msg)
-		return database, ctrl.Result{Requeue: true}, nil
+		return database, ctrl.Result{Requeue: true}
+	}
+
+	targetDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetDatabaseName(), usr, pw)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
+		recorder.Event(database, "Normal", "error", msg)
+		infrav1beta1.DatabaseNotReadyCondition(database, infrav1beta1.ConnectionFailedReason, msg)
+		return database, ctrl.Result{Requeue: true}
+	}
+	for _, extension := range database.GetExtensions() {
+		if err := targetDBHandler.EnableExtension(extension.Name); err != nil {
+			msg := fmt.Sprintf("Failed to create extension %s in database: %s", extension.Name, err.Error())
+			recorder.Event(database, "Normal", "error", msg)
+			infrav1beta1.ExtensionNotReadyCondition(database, infrav1beta1.CreateExtensionFailedReason, msg)
+			return database, ctrl.Result{Requeue: true}
+		}
 	}
 
 	msg := "Database successfully provisioned"
 	recorder.Event(database, "Normal", "info", msg)
 	v1beta1.DatabaseReadyCondition(database, v1beta1.DatabaseProvisiningSuccessfulReason, msg)
-	return database, ctrl.Result{}, nil
+	return database, ctrl.Result{}
 }
 
-func reconcileUser(database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result, error) {
+func reconcileUser(database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result) {
 	// Fetch referencing database
 	databaseName := types.NamespacedName{
 		Namespace: user.GetNamespace(),
@@ -131,7 +149,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		msg := fmt.Sprintf("Referencing database was not found: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(user, v1beta1.DatabaseNotFoundReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
 	// Fetch referencing root secret
@@ -147,7 +165,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		msg := fmt.Sprintf("Referencing root secret was not found: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(user, v1beta1.SecretNotFoundReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
 	usr, pw, err := extractCredentials(database.GetRootSecret(), secret)
@@ -156,16 +174,16 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		msg := fmt.Sprintf("Credentials field not found in referenced rootSecret: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(user, infrav1beta1.CredentialsNotFoundReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), usr, pw)
+	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.DatabaseNotReadyCondition(user, infrav1beta1.ConnectionFailedReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
 	// Fetch referencing credentials secret
@@ -182,7 +200,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		msg := fmt.Sprintf("No credentials found to provision user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.UserNotReadyCondition(user, infrav1beta1.CredentialsNotFoundReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
 	err = dbHandler.SetupUser(database.GetDatabaseName(), usr, pw)
@@ -190,11 +208,11 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
 		infrav1beta1.UserNotReadyCondition(user, infrav1beta1.ConnectionFailedReason, msg)
-		return user, ctrl.Result{Requeue: true}, nil
+		return user, ctrl.Result{Requeue: true}
 	}
 
 	msg := "User successfully provisioned"
 	recorder.Event(user, "Normal", "info", msg)
 	v1beta1.UserReadyCondition(user, v1beta1.UserProvisioningSuccessfulReason, msg)
-	return user, ctrl.Result{}, nil
+	return user, ctrl.Result{}
 }

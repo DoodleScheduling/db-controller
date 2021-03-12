@@ -21,12 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// defaults
-const (
-	DEFAULT_POSTGRESQL_ROOT_USER                    = "postgres"
-	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
-)
-
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
@@ -77,6 +71,14 @@ func (in *PostgreSQLDatabase) GetDatabaseName() string {
 	}
 
 	return in.GetName()
+}
+
+func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
+	return ""
+}
+
+func (in *PostgreSQLDatabase) GetExtensions() Extensions {
+	return in.Spec.Extensions
 }
 
 // +kubebuilder:object:root=true
