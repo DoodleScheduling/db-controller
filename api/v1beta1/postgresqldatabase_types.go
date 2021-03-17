@@ -34,7 +34,7 @@ func (in *PostgreSQLDatabase) GetStatusConditions() *[]metav1.Condition {
 // PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the PostgreSQLDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

@@ -34,7 +34,7 @@ func (in *PostgreSQLUser) GetStatusConditions() *[]metav1.Condition {
 // PostgreSQLUserStatus defines the observed state of PostgreSQLUser
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLUserStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the PostgreSQLUser.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

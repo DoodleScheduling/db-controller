@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.3.0
+    controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
   name: mongodbusers.dbprovisioning.infra.doodle.com
 spec:
@@ -84,7 +84,7 @@ spec:
               IMPORTANT: Run "make" to regenerate code after modifying this file'
             properties:
               conditions:
-                description: Conditions holds the conditions for the VaultBinding.
+                description: Conditions holds the conditions for the MongoDBUser.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
