@@ -34,7 +34,7 @@ func (in *MongoDBDatabase) GetStatusConditions() *[]metav1.Condition {
 // MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBDatabaseStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the MongoDBDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
