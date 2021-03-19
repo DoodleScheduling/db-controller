@@ -116,7 +116,7 @@ func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []
 	ctx := context.Background()
 	var list infrav1beta1.PostgreSQLUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
-		secretIndexKey: objectKey(s).String(),
+		dbIndexKey: objectKey(s).String(),
 	}); err != nil {
 		return nil
 	}
