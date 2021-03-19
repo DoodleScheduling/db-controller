@@ -52,7 +52,7 @@ func (in *MongoDBUser) GetStatusConditions() *[]metav1.Condition {
 // MongoDBUserStatus defines the observed state of MongoDBUser
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBUserStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the MongoDBUser.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

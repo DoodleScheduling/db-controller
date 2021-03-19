@@ -10,35 +10,38 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-type PostgreSQLServer struct {
+type PostgreSQLRepository struct {
 	dbpool *pgxpool.Pool
 }
 
-func NewPostgreSQLServer(ctx context.Context, uri, username, password string) (Handler, error) {
+func NewPostgreSQLRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
 	opt, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
 
 	opt.User = url.UserPassword(username, password)
+
+	if database != "" {
+		opt.Path = database
+	}
 	dbpool, err := pgxpool.Connect(context.Background(), opt.String())
 	if err != nil {
 		return nil, err
-
 	}
 
-	return &PostgreSQLServer{
+	return &PostgreSQLRepository{
 		dbpool: dbpool,
 	}, nil
 }
 
-func (s *PostgreSQLServer) Close() error {
+func (s *PostgreSQLRepository) Close() error {
 	s.dbpool.Close()
 	return nil
 }
 
 // TODO Prepared Statements
-func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
+func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(database string) error {
 	if databaseExists, err := s.doesDatabaseExist(database); err != nil {
 		return err
 	} else {
@@ -61,7 +64,7 @@ func (s *PostgreSQLServer) CreateDatabaseIfNotExists(database string) error {
 	}
 }
 
-func (s *PostgreSQLServer) SetupUser(database string, user string, password string) error {
+func (s *PostgreSQLRepository) SetupUser(database string, user string, password string) error {
 	if err := s.createUserIfNotExists(user); err != nil {
 		return err
 	}
@@ -74,7 +77,7 @@ func (s *PostgreSQLServer) SetupUser(database string, user string, password stri
 	return nil
 }
 
-func (s *PostgreSQLServer) DropUser(database string, user string) error {
+func (s *PostgreSQLRepository) DropUser(database string, user string) error {
 	if err := s.revokeAllPrivileges(database, user); err != nil {
 		return err
 	}
@@ -84,7 +87,16 @@ func (s *PostgreSQLServer) DropUser(database string, user string) error {
 	return nil
 }
 
-func (s *PostgreSQLServer) createUserIfNotExists(user string) error {
+func (s *PostgreSQLRepository) EnableExtension(name string) error {
+	if extensionExists, err := s.doesExtensionExist(name); err != nil {
+		return err
+	} else if !extensionExists {
+		return s.createExtension(name)
+	}
+	return nil
+}
+
+func (s *PostgreSQLRepository) createUserIfNotExists(user string) error {
 	if userExists, err := s.doesUserExist(user); err != nil {
 		return err
 	} else {
@@ -107,7 +119,12 @@ func (s *PostgreSQLServer) createUserIfNotExists(user string) error {
 	}
 }
 
-func (s *PostgreSQLServer) dropUserIfNotExist(user string) error {
+func (s *PostgreSQLRepository) createExtension(name string) error {
+	_, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("CREATE EXTENSION %s;", name))
+	return err
+}
+
+func (s *PostgreSQLRepository) dropUserIfNotExist(user string) error {
 	if userExists, err := s.doesUserExist(user); err != nil {
 		return err
 	} else {
@@ -130,28 +147,28 @@ func (s *PostgreSQLServer) dropUserIfNotExist(user string) error {
 	}
 }
 
-func (s *PostgreSQLServer) setPasswordForUser(user string, password string) error {
+func (s *PostgreSQLRepository) setPasswordForUser(user string, password string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("ALTER USER \"%s\" WITH ENCRYPTED PASSWORD '%s';", user, password)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *PostgreSQLServer) grantAllPrivileges(database string, user string) error {
+func (s *PostgreSQLRepository) grantAllPrivileges(database string, user string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *PostgreSQLServer) revokeAllPrivileges(database string, user string) error {
+func (s *PostgreSQLRepository) revokeAllPrivileges(database string, user string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\";", database, user)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *PostgreSQLServer) doesDatabaseExist(database string) (bool, error) {
+func (s *PostgreSQLRepository) doesDatabaseExist(database string) (bool, error) {
 	var result int64
 	err := s.dbpool.QueryRow(context.Background(), fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s';", database)).Scan(&result)
 	if err != nil {
@@ -163,9 +180,21 @@ func (s *PostgreSQLServer) doesDatabaseExist(database string) (bool, error) {
 	return result == 1, nil
 }
 
-func (s *PostgreSQLServer) doesUserExist(user string) (bool, error) {
+func (s *PostgreSQLRepository) doesUserExist(user string) (bool, error) {
 	var result int64
 	err := s.dbpool.QueryRow(context.Background(), fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s';", user)).Scan(&result)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return result == 1, nil
+}
+
+func (s *PostgreSQLRepository) doesExtensionExist(name string) (bool, error) {
+	var result int64
+	err := s.dbpool.QueryRow(context.Background(), fmt.Sprintf("SELECT 1 from pg_extension where extname='%s';", name)).Scan(&result)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil

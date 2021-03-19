@@ -21,12 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// defaults
-const (
-	DEFAULT_MONGODB_ROOT_USER                    = "root"
-	DEFAULT_MONGODB_ROOT_AUTHENTICATION_DATABASE = "admin"
-)
-
 // MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
 type MongoDBDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
@@ -40,7 +34,7 @@ func (in *MongoDBDatabase) GetStatusConditions() *[]metav1.Condition {
 // MongoDBDatabaseStatus defines the observed state of MongoDBDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type MongoDBDatabaseStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the MongoDBDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -77,6 +71,14 @@ func (in *MongoDBDatabase) GetDatabaseName() string {
 	}
 
 	return in.GetName()
+}
+
+func (in *MongoDBDatabase) GetRootDatabaseName() string {
+	return ""
+}
+
+func (in *MongoDBDatabase) GetExtensions() Extensions {
+	return in.Spec.Extensions
 }
 
 // +kubebuilder:object:root=true

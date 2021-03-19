@@ -21,12 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// defaults
-const (
-	DEFAULT_POSTGRESQL_ROOT_USER                    = "postgres"
-	DEFAULT_POSTGRESQL_ROOT_AUTHENTICATION_DATABASE = "postgres"
-)
-
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
@@ -40,7 +34,7 @@ func (in *PostgreSQLDatabase) GetStatusConditions() *[]metav1.Condition {
 // PostgreSQLDatabaseStatus defines the observed state of PostgreSQLDatabase
 // IMPORTANT: Run "make" to regenerate code after modifying this file
 type PostgreSQLDatabaseStatus struct {
-	// Conditions holds the conditions for the VaultBinding.
+	// Conditions holds the conditions for the PostgreSQLDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -77,6 +71,14 @@ func (in *PostgreSQLDatabase) GetDatabaseName() string {
 	}
 
 	return in.GetName()
+}
+
+func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
+	return ""
+}
+
+func (in *PostgreSQLDatabase) GetExtensions() Extensions {
+	return in.Spec.Extensions
 }
 
 // +kubebuilder:object:root=true

@@ -6,7 +6,6 @@ keywords:
 - kubernetes-controller
 - mongodb
 - postgresql
-- vault
 name: k8sdb-controller
 sources:
 - https://github.com/DoodleScheduling/k8sdb-controller

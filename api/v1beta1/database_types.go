@@ -12,8 +12,9 @@ const (
 
 // Status conditions
 const (
-	DatabaseReadyConditionType = "DatabaseReady"
-	UserReadyConditionType     = "UserReady"
+	DatabaseReadyConditionType  = "DatabaseReady"
+	UserReadyConditionType      = "UserReady"
+	ExtensionReadyConditionType = "ExtensionReady"
 )
 
 // Status reasons
@@ -27,6 +28,7 @@ const (
 	UserProvisioningSuccessfulReason    = "UserProvisioningSuccessful"
 	CredentialsNotFoundReason           = "CredentialsNotFound"
 	CreateDatabaseFailedReason          = "CreateDatabaseFailed"
+	CreateExtensionFailedReason         = "CreateExtensionFailed"
 )
 
 // DatabaseSpec defines the desired state of MongoDBDatabase
@@ -42,6 +44,10 @@ type DatabaseSpec struct {
 	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
+
+	// Database extensions
+	// +optional
+	Extensions Extensions `json:"extensions,omitempty"`
 }
 
 // DatabaseReference is a named reference to a database kind
@@ -66,6 +72,14 @@ type SecretReference struct {
 	PasswordField string `json:"passwordField"`
 }
 
+// Extension is a resource representing database extension
+type Extension struct {
+	Name string `json:"name"`
+}
+
+// Extensions is a collection of Extension types
+type Extensions []Extension
+
 // conditionalResource is a resource with conditions
 type conditionalResource interface {
 	GetStatusConditions() *[]metav1.Condition
@@ -77,6 +91,10 @@ func DatabaseNotReadyCondition(in conditionalResource, reason, message string) {
 
 func DatabaseReadyCondition(in conditionalResource, reason, message string) {
 	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionTrue, reason, message)
+}
+
+func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func UserNotReadyCondition(in conditionalResource, reason, message string) {

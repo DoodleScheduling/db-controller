@@ -177,7 +177,7 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}*/
 
 	var database infrav1beta1.MongoDBDatabase
-	_, result, reconcileErr := reconcileUser(&database, r.Client, r.ClientPool, db.NewMongoDBServer, &user, r.Recorder)
+	_, result := reconcileUser(&database, r.Client, r.ClientPool, db.NewMongoDBRepository, &user, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
@@ -185,7 +185,7 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return result, reconcileErr
+	return result, nil
 }
 
 func (r *MongoDBUserReconciler) patchStatus(ctx context.Context, database *infrav1beta1.MongoDBUser) error {
