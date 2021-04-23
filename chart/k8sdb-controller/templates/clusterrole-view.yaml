@@ -1,0 +1,35 @@
+{{- if .Values.clusterRBAC.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "k8sdb-controller.fullname" . }}-view
+  labels:
+    app.kubernetes.io/name: {{ include "k8sdb-controller.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "k8sdb-controller.chart" . }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  annotations:
+    {{- toYaml .Values.annotations | nindent 4 }}
+rules:
+- apiGroups:
+  - "dbprovisioning.infra.doodle.com"
+  resources:
+  - mongodbdatabases
+  - mongodbusers
+  - postgresqldatabases
+  - postgresqlusers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "dbprovisioning.infra.doodle.com"
+  resources:
+  - mongodbdatabases/status
+  - mongodbusers/status
+  - postgresqldatabases/status
+  - postgresqlusers/status
+  verbs:
+  - get
+{{- end }}
