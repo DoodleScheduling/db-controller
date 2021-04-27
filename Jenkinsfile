@@ -63,6 +63,7 @@ podTemplate(label: 'k8sdb-controller',
             bumpImageVersion(env.TAG_NAME)
 
             tgz="k8sdb-controller-${version}.tgz"
+            sh "mkdir chart/k8sdb-controller/crds"
             sh "cp config/crd/bases/* chart/k8sdb-controller/crds"
             sh "helm package chart/k8sdb-controller"
           }
