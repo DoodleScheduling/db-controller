@@ -40,6 +40,7 @@ type user interface {
 	runtime.Object
 	GetStatusConditions() *[]metav1.Condition
 	GetCredentials() *infrav1beta1.SecretReference
+	GetRoles() *[]infrav1beta1.Role
 	GetDatabase() string
 }
 
@@ -70,6 +71,17 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	}
 
 	return user, pw, nil
+}
+
+func extractRoles(roles *[]infrav1beta1.Role) []string {
+	if roles == nil || len(*roles) == 0 {
+		return nil
+	}
+	rolesToReturn := make([]string, 0)
+	for _, r := range *roles {
+		rolesToReturn = append(rolesToReturn, r.Name)
+	}
+	return rolesToReturn
 }
 
 func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
@@ -203,7 +215,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	err = dbHandler.SetupUser(database.GetDatabaseName(), usr, pw)
+	err = dbHandler.SetupUser(database.GetDatabaseName(), usr, pw, extractRoles(user.GetRoles()))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)

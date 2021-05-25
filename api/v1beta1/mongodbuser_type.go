@@ -28,20 +28,12 @@ type MongoDBUserSpec struct {
 	// +required
 	Credentials *SecretReference `json:"credentials"`
 
-	// Roles is not yet suppported
 	// +optional
-	//Roles []*MongoDBRole `json:"roles"`
+	Roles *[]Role `json:"roles,omitempty"`
 
 	// CustomData is not yet supported
 	// +optional
 	//CustomData map[string]string `json:"customData"`
-}
-
-// MongoDBRole see https://docs.mongodb.com/manual/reference/method/db.createUser/#create-user-with-roles
-type MongoDBRole struct {
-	// +optional
-	// +kubebuilder:default:=readWrite
-	Role string `json:"role"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -81,6 +73,10 @@ func (in *MongoDBUser) GetDatabase() string {
 
 func (in *MongoDBUser) GetCredentials() *SecretReference {
 	return in.Spec.Credentials
+}
+
+func (in *MongoDBUser) GetRoles() *[]Role {
+	return in.Spec.Roles
 }
 
 // +kubebuilder:object:root=true

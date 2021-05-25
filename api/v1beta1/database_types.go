@@ -72,6 +72,10 @@ type SecretReference struct {
 	PasswordField string `json:"passwordField"`
 }
 
+type Role struct {
+	Name string `json:"name"`
+}
+
 // Extension is a resource representing database extension
 type Extension struct {
 	Name string `json:"name"`

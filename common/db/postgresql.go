@@ -14,6 +14,11 @@ type PostgreSQLRepository struct {
 	dbpool *pgxpool.Pool
 }
 
+const (
+	DefaultPostgreSQLReadRole      = "read"
+	DefaultPostgreSQLReadWriteRole = "readWrite"
+)
+
 func NewPostgreSQLRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
 	opt, err := url.Parse(uri)
 	if err != nil {
@@ -64,14 +69,14 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(database string) error 
 	}
 }
 
-func (s *PostgreSQLRepository) SetupUser(database string, user string, password string) error {
+func (s *PostgreSQLRepository) SetupUser(database string, user string, password string, roles []string) error {
 	if err := s.createUserIfNotExists(user); err != nil {
 		return err
 	}
 	if err := s.setPasswordForUser(user, password); err != nil {
 		return err
 	}
-	if err := s.grantAllPrivileges(database, user); err != nil {
+	if err := s.setUpPrivileges(database, user, roles); err != nil {
 		return err
 	}
 	return nil
@@ -154,8 +159,44 @@ func (s *PostgreSQLRepository) setPasswordForUser(user string, password string) 
 	return nil
 }
 
+func (s *PostgreSQLRepository) setUpPrivileges(database string, user string, roles []string) error {
+	// by default, grant all privileges (backward compatibility)
+	if roles == nil || len(roles) == 0 {
+		return s.grantAllPrivileges(database, user)
+	}
+	for _, r := range roles {
+		if r == DefaultPostgreSQLReadWriteRole {
+			// Treat readWrite as 'all' for now; don't need to handle other roles
+			return s.grantAllPrivileges(database, user)
+		}
+		if r == DefaultPostgreSQLReadRole {
+			if err := s.grantReadPrivileges(database, user); err != nil {
+				return err
+			}
+			// continue to other roles
+		}
+	}
+	return nil
+}
+
 func (s *PostgreSQLRepository) grantAllPrivileges(database string, user string) error {
 	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostgreSQLRepository) grantReadPrivileges(database string, user string) error {
+	// We don't have schema support, so use "public" schema for now
+	schema := "public"
+
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT CONNECT ON DATABASE \"%s\" TO \"%s\";", database, user)); err != nil {
+		return err
+	}
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT USAGE ON SCHEMA \"%s\" TO \"%s\";", schema, user)); err != nil {
+		return err
+	}
+	if _, err := s.dbpool.Exec(context.Background(), fmt.Sprintf("GRANT SELECT ON ALL TABLES IN SCHEMA \"%s\" TO \"%s\";", schema, user)); err != nil {
 		return err
 	}
 	return nil

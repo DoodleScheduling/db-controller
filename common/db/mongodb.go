@@ -61,20 +61,20 @@ func (m *MongoDBRepository) Close() error {
 	return m.client.Disconnect(ctx)
 }
 
-// CreateDatabaseIfNotExists is a dummy to apply to fullfill the contract,
+// CreateDatabaseIfNotExists is a dummy to apply to fulfill the contract,
 // we don't need to create the database on MongoDB
 func (m *MongoDBRepository) CreateDatabaseIfNotExists(database string) error {
 	return nil
 }
 
-func (m *MongoDBRepository) SetupUser(database string, username string, password string) error {
+func (m *MongoDBRepository) SetupUser(database string, username string, password string, roles []string) error {
 	doesUserExist, err := m.doesUserExist(database, username)
 	if err != nil {
 		return err
 	}
 
 	if !doesUserExist {
-		if err := m.createUser(database, username, password); err != nil {
+		if err := m.createUser(database, username, password, roles); err != nil {
 			return err
 		}
 		if doesUserExistNow, err := m.doesUserExist(database, username); err != nil {
@@ -83,7 +83,7 @@ func (m *MongoDBRepository) SetupUser(database string, username string, password
 			return errors.New("user doesn't exist after create")
 		}
 	} else {
-		if err := m.updateUserPasswordAndRoles(database, username, password); err != nil {
+		if err := m.updateUserPasswordAndRoles(database, username, password, roles); err != nil {
 			return err
 		}
 	}
@@ -138,9 +138,27 @@ func (m *MongoDBRepository) getAllUsers(database string, username string) (Users
 	return users, nil
 }
 
-func (m *MongoDBRepository) createUser(database string, username string, password string) error {
+func (m *MongoDBRepository) getRoles(database string, roles []string) []bson.M {
+	// by default, assign readWrite role (backward compatibility)
+	if roles == nil || len(roles) == 0 {
+		return []bson.M{{
+			"role": "readWrite",
+			"db":   database,
+		}}
+	}
+	rs := make([]bson.M, 0)
+	for _, r := range roles {
+		rs = append(rs, bson.M{
+			"role": r,
+			"db":   database,
+		})
+	}
+	return rs
+}
+
+func (m *MongoDBRepository) createUser(database string, username string, password string, roles []string) error {
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
-		primitive.E{Key: "roles", Value: []bson.M{{"role": "readWrite", "db": database}}}}
+		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err
@@ -148,9 +166,9 @@ func (m *MongoDBRepository) createUser(database string, username string, passwor
 	return nil
 }
 
-func (m *MongoDBRepository) updateUserPasswordAndRoles(database string, username string, password string) error {
+func (m *MongoDBRepository) updateUserPasswordAndRoles(database string, username string, password string, roles []string) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
-		primitive.E{Key: "roles", Value: []bson.M{{"role": "readWrite", "db": database}}}}
+		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err
