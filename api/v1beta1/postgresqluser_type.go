@@ -27,9 +27,6 @@ type PostgreSQLUserSpec struct {
 
 	// +required
 	Credentials *SecretReference `json:"credentials"`
-
-	// +optional
-	Roles *[]Role `json:"roles,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -72,7 +69,8 @@ func (in *PostgreSQLUser) GetCredentials() *SecretReference {
 }
 
 func (in *PostgreSQLUser) GetRoles() *[]Role {
-	return in.Spec.Roles
+	// NOOP
+	return nil
 }
 
 // +kubebuilder:object:root=true

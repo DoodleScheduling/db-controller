@@ -35,8 +35,6 @@ spec:
     name: my-app
   credentials:
     name: my-app-postgresql-credentials
-  roles:
-    - name: readWrite
 ---
 apiVersion: v1
 kind: Secret
