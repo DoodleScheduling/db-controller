@@ -29,7 +29,8 @@ type MongoDBUserSpec struct {
 	Credentials *SecretReference `json:"credentials"`
 
 	// +optional
-	Roles *[]Role `json:"roles,omitempty"`
+	// +kubebuilder:default:={{name: readWrite}}
+	Roles *[]Role `json:"roles"`
 
 	// CustomData is not yet supported
 	// +optional
