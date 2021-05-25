@@ -35,6 +35,8 @@ spec:
     name: my-app
   credentials:
     name: my-app-postgresql-credentials
+  roles:
+    - name: readWrite
 ---
 apiVersion: v1
 kind: Secret
@@ -77,6 +79,8 @@ spec:
     name: my-app-mongodb-credentials
   credentials:
     name: my-app-mongodb
+  roles:
+    - name: readWrite
 ---
 apiVersion: v1
 kind: Secret
