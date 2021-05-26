@@ -14,6 +14,11 @@ type PostgreSQLRepository struct {
 	dbpool *pgxpool.Pool
 }
 
+const (
+	DefaultPostgreSQLReadRole      = "read"
+	DefaultPostgreSQLReadWriteRole = "readWrite"
+)
+
 func NewPostgreSQLRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
 	opt, err := url.Parse(uri)
 	if err != nil {
@@ -64,7 +69,7 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(database string) error 
 	}
 }
 
-func (s *PostgreSQLRepository) SetupUser(database string, user string, password string) error {
+func (s *PostgreSQLRepository) SetupUser(database string, user string, password string, roles []string) error {
 	if err := s.createUserIfNotExists(user); err != nil {
 		return err
 	}

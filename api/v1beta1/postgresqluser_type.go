@@ -22,8 +22,11 @@ import (
 )
 
 type PostgreSQLUserSpec struct {
-	Database    *DatabaseReference `json:"database"`
-	Credentials *SecretReference   `json:"credentials"`
+	// +required
+	Database *DatabaseReference `json:"database"`
+
+	// +required
+	Credentials *SecretReference `json:"credentials"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -63,6 +66,11 @@ func (in *PostgreSQLUser) GetDatabase() string {
 
 func (in *PostgreSQLUser) GetCredentials() *SecretReference {
 	return in.Spec.Credentials
+}
+
+func (in *PostgreSQLUser) GetRoles() *[]Role {
+	// NOOP
+	return nil
 }
 
 // +kubebuilder:object:root=true

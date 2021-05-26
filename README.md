@@ -77,6 +77,8 @@ spec:
     name: my-app-mongodb-credentials
   credentials:
     name: my-app-mongodb
+  roles:
+    - name: readWrite
 ---
 apiVersion: v1
 kind: Secret

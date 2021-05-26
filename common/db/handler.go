@@ -10,7 +10,7 @@ type Invoke func(ctx context.Context, uri, database, username, password string) 
 // Handler is a wrapper arround a certain database client
 type Handler interface {
 	Close() error
-	SetupUser(database string, username string, password string) error
+	SetupUser(database string, username string, password string, roles []string) error
 	DropUser(database string, username string) error
 	CreateDatabaseIfNotExists(database string) error
 	EnableExtension(name string) error
