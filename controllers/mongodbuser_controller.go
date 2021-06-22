@@ -51,7 +51,7 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 		func(o client.Object) []string {
 			usr := o.(*infrav1beta1.MongoDBUser)
 			return []string{
-				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Credentials),
+				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Credentials.Name),
 			}
 		},
 	); err != nil {
@@ -63,7 +63,7 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 		func(o client.Object) []string {
 			usr := o.(*infrav1beta1.MongoDBUser)
 			return []string{
-				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Database),
+				fmt.Sprintf("%s/%s", usr.GetNamespace(), usr.Spec.Database.Name),
 			}
 		},
 	); err != nil {
@@ -93,14 +93,14 @@ func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []recon
 	ctx := context.Background()
 	var list infrav1beta1.MongoDBUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
-		secretIndexKey: objectKey(s).String(),
+		credentialsIndexKey: objectKey(s).String(),
 	}); err != nil {
 		return nil
 	}
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a mongodbuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a mongodbuser change detected, reconcile", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
@@ -123,7 +123,7 @@ func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []rec
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced database from a mongodbuser change detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced database from a mongodbuser change detected, reconcile", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
