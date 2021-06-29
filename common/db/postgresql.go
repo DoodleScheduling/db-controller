@@ -46,7 +46,7 @@ func NewPostgreSQLRepository(ctx context.Context, uri, database, username, passw
 		opt.Path = database
 	}
 
-	dbpool, err := pgxpool.Connect(context.Background(), opt.String())
+	dbpool, err := pgxpool.Connect(ctx, opt.String())
 	if err != nil {
 		return nil, err
 	}
