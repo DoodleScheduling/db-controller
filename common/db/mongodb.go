@@ -35,7 +35,10 @@ type MongoDBRepository struct {
 }
 
 func NewMongoDBRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
-	o := options.Client().ApplyURI(uri)
+	o := options.Client()
+	o.SetConnectTimeout(time.Duration(2) * time.Second)
+	o.ApplyURI(uri)
+
 	o.SetAuth(options.Credential{
 		Username: username,
 		Password: password,

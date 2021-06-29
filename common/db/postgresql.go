@@ -27,9 +27,25 @@ func NewPostgreSQLRepository(ctx context.Context, uri, database, username, passw
 
 	opt.User = url.UserPassword(username, password)
 
+	q, _ := url.ParseQuery(opt.RawQuery)
+	hasConnectTimeout := false
+	for k, _ := range q {
+		if k == "connect_timeout" {
+			hasConnectTimeout = true
+			break
+		}
+	}
+
+	if hasConnectTimeout == false {
+		q.Add("connect_timeout", "2")
+	}
+
+	opt.RawQuery = q.Encode()
+
 	if database != "" {
 		opt.Path = database
 	}
+
 	dbpool, err := pgxpool.Connect(context.Background(), opt.String())
 	if err != nil {
 		return nil, err

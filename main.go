@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/db"
 	"github.com/doodlescheduling/k8sdb-controller/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -155,11 +154,10 @@ func main() {
 
 	// MongoDBDatabase setup
 	if err = (&controllers.MongoDBDatabaseReconciler{
-		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
-		Scheme:     mgr.GetScheme(),
-		ClientPool: db.NewClientPool(),
-		Recorder:   mgr.GetEventRecorderFor("MongoDBDatabase"),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("MongoDBDatabase"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBDatabase")
 		os.Exit(1)
@@ -167,11 +165,10 @@ func main() {
 
 	// MongoDBUser setup
 	if err = (&controllers.MongoDBUserReconciler{
-		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("controllers").WithName("MongoDBUser"),
-		Scheme:     mgr.GetScheme(),
-		ClientPool: db.NewClientPool(),
-		Recorder:   mgr.GetEventRecorderFor("MongoDBUser"),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBUser"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("MongoDBUser"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBUser")
 		os.Exit(1)
@@ -179,11 +176,10 @@ func main() {
 
 	// PostgreSQLDatabase setup
 	if err = (&controllers.PostgreSQLDatabaseReconciler{
-		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
-		Scheme:     mgr.GetScheme(),
-		ClientPool: db.NewClientPool(),
-		Recorder:   mgr.GetEventRecorderFor("PostgreSQLDatabase"),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("PostgreSQLDatabase"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLDatabase")
 		os.Exit(1)
@@ -191,11 +187,10 @@ func main() {
 
 	// PostgreSQLUser setup
 	if err = (&controllers.PostgreSQLUserReconciler{
-		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("controllers").WithName("PostgreSQLUser"),
-		Scheme:     mgr.GetScheme(),
-		ClientPool: db.NewClientPool(),
-		Recorder:   mgr.GetEventRecorderFor("PostgreSQLUser"),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLUser"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("PostgreSQLUser"),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLUser")
 		os.Exit(1)

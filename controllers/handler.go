@@ -84,7 +84,7 @@ func extractRoles(roles *[]infrav1beta1.Role) []string {
 	return rolesToReturn
 }
 
-func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
+func reconcileDatabase(c client.Client, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
 	// Fetch referencing root secret
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
@@ -110,7 +110,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
-	rootDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
+	rootDBHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -126,7 +126,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
-	targetDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetDatabaseName(), usr, pw)
+	targetDBHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -148,7 +148,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 	return database, ctrl.Result{}
 }
 
-func reconcileUser(database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result) {
+func reconcileUser(database database, c client.Client, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result) {
 	// Fetch referencing database
 	databaseName := types.NamespacedName{
 		Namespace: user.GetNamespace(),
@@ -189,7 +189,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
+	dbHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())

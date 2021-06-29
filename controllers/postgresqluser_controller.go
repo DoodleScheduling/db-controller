@@ -39,10 +39,9 @@ import (
 // PostgreSQLUserReconciler reconciles a PostgreSQLUser object
 type PostgreSQLUserReconciler struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Recorder   record.EventRecorder
-	ClientPool *db.ClientPool
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 func (r *PostgreSQLUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -177,7 +176,7 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}*/
 
 	var database infrav1beta1.PostgreSQLDatabase
-	_, result := reconcileUser(&database, r.Client, r.ClientPool, db.NewPostgreSQLRepository, &user, r.Recorder)
+	_, result := reconcileUser(&database, r.Client, db.NewPostgreSQLRepository, &user, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
