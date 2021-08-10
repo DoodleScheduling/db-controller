@@ -73,8 +73,10 @@ type SecretReference struct {
 }
 
 type Role struct {
-	Name string  `json:"name"`
-	Db   *string `json:"db,omitempty"`
+	Name string `json:"name"`
+
+	// +optional
+	Db *string `json:"db,omitempty"`
 }
 
 // Extension is a resource representing database extension
