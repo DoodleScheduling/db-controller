@@ -83,7 +83,6 @@ spec:
                 - name
                 type: object
             required:
-            - address
             - rootSecret
             type: object
           status:

@@ -73,9 +73,9 @@ func (m *AtlasRepository) EnableExtension(ctx context.Context, name string) erro
 }
 
 func (m *AtlasRepository) doesUserExist(ctx context.Context, database string, username string) (bool, error) {
-	user, _, err := m.atlas.DatabaseUsers.Get(ctx, database, m.groupId, username)
-	if user == nil {
-		return false, err
+	_, _, err := m.atlas.DatabaseUsers.Get(ctx, database, m.groupId, username)
+	if err != nil {
+		return false, nil
 	}
 
 	return true, err
@@ -93,13 +93,13 @@ func (m *AtlasRepository) getRoles(database string, roles []infrav1beta1.Role) [
 	rs := make([]mongodbatlas.Role, 0)
 	for _, r := range roles {
 		db := r.Db
-		if db == nil {
-			db = &database
+		if db == "" {
+			db = database
 		}
 
 		rs = append(rs, mongodbatlas.Role{
 			RoleName:     r.Name,
-			DatabaseName: *db,
+			DatabaseName: db,
 		})
 	}
 
@@ -108,9 +108,10 @@ func (m *AtlasRepository) getRoles(database string, roles []infrav1beta1.Role) [
 
 func (m *AtlasRepository) createUser(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
 	user := &mongodbatlas.DatabaseUser{
-		Username: username,
-		Password: password,
-		Roles:    m.getRoles(database, roles),
+		Username:     username,
+		Password:     password,
+		DatabaseName: database,
+		Roles:        m.getRoles(database, roles),
 	}
 
 	_, _, err := m.atlas.DatabaseUsers.Create(ctx, m.groupId, user)

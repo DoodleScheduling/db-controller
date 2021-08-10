@@ -39,10 +39,9 @@ import (
 // MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
 type MongoDBDatabaseReconciler struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Recorder   record.EventRecorder
-	ClientPool *db.ClientPool
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -130,7 +129,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return reconcile.Result{}, nil
 	}
 
-	_, result := reconcileDatabase(r.Client, r.ClientPool, db.NewMongoDBRepository, &database, r.Recorder)
+	_, result := reconcileDatabase(r.Client, db.NewMongoDBRepository, &database, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &database); err != nil {

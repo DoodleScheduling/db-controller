@@ -39,10 +39,9 @@ import (
 // MongoDBUserReconciler reconciles a MongoDBUser object
 type MongoDBUserReconciler struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Recorder   record.EventRecorder
-	ClientPool *db.ClientPool
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -177,7 +176,7 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}*/
 
 	var database infrav1beta1.MongoDBDatabase
-	_, result := reconcileUser(&database, r.Client, r.ClientPool, db.NewMongoDBRepository, &user, r.Recorder)
+	_, result := reconcileUser(&database, r.Client, db.NewMongoDBRepository, &user, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {

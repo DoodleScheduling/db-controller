@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -36,7 +37,10 @@ type MongoDBRepository struct {
 }
 
 func NewMongoDBRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
-	o := options.Client().ApplyURI(uri)
+	o := options.Client()
+	o.SetConnectTimeout(time.Duration(2) * time.Second)
+	o.ApplyURI(uri)
+
 	o.SetAuth(options.Credential{
 		Username: username,
 		Password: password,
@@ -146,8 +150,8 @@ func (m *MongoDBRepository) getRoles(database string, roles []infrav1beta1.Role)
 	rs := make([]bson.M, 0)
 	for _, r := range roles {
 		db := r.Db
-		if db == nil {
-			db = &database
+		if db == "" {
+			db = database
 		}
 
 		rs = append(rs, bson.M{

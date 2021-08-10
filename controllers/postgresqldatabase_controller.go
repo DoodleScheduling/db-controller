@@ -39,10 +39,9 @@ import (
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
 type PostgreSQLDatabaseReconciler struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Recorder   record.EventRecorder
-	ClientPool *db.ClientPool
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -130,7 +129,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return reconcile.Result{}, nil
 	}
 
-	_, result := reconcileDatabase(r.Client, r.ClientPool, db.NewPostgreSQLRepository, &database, r.Recorder)
+	_, result := reconcileDatabase(r.Client, db.NewPostgreSQLRepository, &database, r.Recorder)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &database); err != nil {

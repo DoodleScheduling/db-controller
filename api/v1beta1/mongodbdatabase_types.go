@@ -24,6 +24,7 @@ import (
 // MongoDBDatabaseSpec defines the desired state of MongoDBDatabase
 type MongoDBDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
+	AtlasGroupId  string `json:"atlasGroupId,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -55,6 +56,10 @@ type MongoDBDatabase struct {
 
 	Spec   MongoDBDatabaseSpec   `json:"spec,omitempty"`
 	Status MongoDBDatabaseStatus `json:"status,omitempty"`
+}
+
+func (in *MongoDBDatabase) GetAtlasGroupId() string {
+	return in.Spec.AtlasGroupId
 }
 
 func (in *MongoDBDatabase) GetAddress() string {
