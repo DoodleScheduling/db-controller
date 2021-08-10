@@ -10,6 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
 const (
@@ -67,7 +69,7 @@ func (m *MongoDBRepository) CreateDatabaseIfNotExists(database string) error {
 	return nil
 }
 
-func (m *MongoDBRepository) SetupUser(database string, username string, password string, roles []string) error {
+func (m *MongoDBRepository) SetupUser(database string, username string, password string, roles []infrav1beta1.Role) error {
 	doesUserExist, err := m.doesUserExist(database, username)
 	if err != nil {
 		return err
@@ -138,9 +140,9 @@ func (m *MongoDBRepository) getAllUsers(database string, username string) (Users
 	return users, nil
 }
 
-func (m *MongoDBRepository) getRoles(database string, roles []string) []bson.M {
+func (m *MongoDBRepository) getRoles(database string, roles []infrav1beta1.Role) []bson.M {
 	// by default, assign readWrite role (backward compatibility)
-	if roles == nil || len(roles) == 0 {
+	if len(roles) == 0 {
 		return []bson.M{{
 			"role": "readWrite",
 			"db":   database,
@@ -148,15 +150,20 @@ func (m *MongoDBRepository) getRoles(database string, roles []string) []bson.M {
 	}
 	rs := make([]bson.M, 0)
 	for _, r := range roles {
+		db := r.Db
+		if db == nil {
+			db = &database
+		}
+
 		rs = append(rs, bson.M{
-			"role": r,
-			"db":   database,
+			"role": r.Name,
+			"db":   db,
 		})
 	}
 	return rs
 }
 
-func (m *MongoDBRepository) createUser(database string, username string, password string, roles []string) error {
+func (m *MongoDBRepository) createUser(database string, username string, password string, roles []infrav1beta1.Role) error {
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(database, command)
@@ -166,7 +173,7 @@ func (m *MongoDBRepository) createUser(database string, username string, passwor
 	return nil
 }
 
-func (m *MongoDBRepository) updateUserPasswordAndRoles(database string, username string, password string, roles []string) error {
+func (m *MongoDBRepository) updateUserPasswordAndRoles(database string, username string, password string, roles []infrav1beta1.Role) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(database, command)

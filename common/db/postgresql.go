@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -69,7 +70,7 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(database string) error 
 	}
 }
 
-func (s *PostgreSQLRepository) SetupUser(database string, user string, password string, roles []string) error {
+func (s *PostgreSQLRepository) SetupUser(database string, user string, password string, roles []infrav1beta1.Role) error {
 	if err := s.createUserIfNotExists(user); err != nil {
 		return err
 	}
