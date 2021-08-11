@@ -57,6 +57,10 @@ type PostgreSQLDatabase struct {
 	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
 }
 
+func (in *PostgreSQLDatabase) GetAtlasGroupId() string {
+	return ""
+}
+
 func (in *PostgreSQLDatabase) GetAddress() string {
 	return in.Spec.Address
 }

@@ -76,8 +76,12 @@ func (in *MongoDBUser) GetCredentials() *SecretReference {
 	return in.Spec.Credentials
 }
 
-func (in *MongoDBUser) GetRoles() *[]Role {
-	return in.Spec.Roles
+func (in *MongoDBUser) GetRoles() []Role {
+	if in.Spec.Roles == nil {
+		return []Role{}
+	}
+
+	return *in.Spec.Roles
 }
 
 // +kubebuilder:object:root=true

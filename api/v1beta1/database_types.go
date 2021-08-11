@@ -38,8 +38,8 @@ type DatabaseSpec struct {
 	DatabaseName string `json:"databaseName"`
 
 	// The connect URI
-	// +required
-	Address string `json:"address"`
+	// +optional
+	Address string `json:"address,omitempty"`
 
 	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
@@ -74,6 +74,9 @@ type SecretReference struct {
 
 type Role struct {
 	Name string `json:"name"`
+
+	// +optional
+	DB string `json:"db,omitempty"`
 }
 
 // Extension is a resource representing database extension

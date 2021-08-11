@@ -30,6 +30,7 @@ type database interface {
 	GetStatusConditions() *[]metav1.Condition
 	GetRootSecret() *infrav1beta1.SecretReference
 	GetAddress() string
+	GetAtlasGroupId() string
 	GetDatabaseName() string
 	GetRootDatabaseName() string
 	GetExtensions() infrav1beta1.Extensions
@@ -40,7 +41,7 @@ type user interface {
 	runtime.Object
 	GetStatusConditions() *[]metav1.Condition
 	GetCredentials() *infrav1beta1.SecretReference
-	GetRoles() *[]infrav1beta1.Role
+	GetRoles() []infrav1beta1.Role
 	GetDatabase() string
 }
 
@@ -50,6 +51,18 @@ func objectKey(object metav1.Object) client.ObjectKey {
 		Namespace: object.GetNamespace(),
 		Name:      object.GetName(),
 	}
+}
+
+func extractRoles(roles []infrav1beta1.Role) db.Roles {
+	list := make(db.Roles, 0)
+	for _, r := range roles {
+		list = append(list, db.Role{
+			Name: r.Name,
+			DB:   r.DB,
+		})
+	}
+
+	return list
 }
 
 func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev1.Secret) (string, string, error) {
@@ -73,18 +86,11 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	return user, pw, nil
 }
 
-func extractRoles(roles *[]infrav1beta1.Role) []string {
-	if roles == nil || len(*roles) == 0 {
-		return nil
+func reconcileDatabase(c client.Client, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
+	if database.GetAtlasGroupId() != "" {
+		return reconcileAtlasDatabase(c, database, recorder)
 	}
-	rolesToReturn := make([]string, 0)
-	for _, r := range *roles {
-		rolesToReturn = append(rolesToReturn, r.Name)
-	}
-	return rolesToReturn
-}
 
-func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, database database, recorder record.EventRecorder) (database, ctrl.Result) {
 	// Fetch referencing root secret
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
@@ -101,6 +107,8 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
+	ctx := context.TODO()
+
 	usr, pw, err := extractCredentials(database.GetRootSecret(), secret)
 
 	if err != nil {
@@ -110,7 +118,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
-	rootDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
+	rootDBHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -118,7 +126,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
-	err = rootDBHandler.CreateDatabaseIfNotExists(database.GetDatabaseName())
+	err = rootDBHandler.CreateDatabaseIfNotExists(ctx, database.GetDatabaseName())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provision database: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -126,7 +134,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 
-	targetDBHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetDatabaseName(), usr, pw)
+	targetDBHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetDatabaseName(), usr, pw)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
 		recorder.Event(database, "Normal", "error", msg)
@@ -134,7 +142,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 		return database, ctrl.Result{Requeue: true}
 	}
 	for _, extension := range database.GetExtensions() {
-		if err := targetDBHandler.EnableExtension(extension.Name); err != nil {
+		if err := targetDBHandler.EnableExtension(ctx, extension.Name); err != nil {
 			msg := fmt.Sprintf("Failed to create extension %s in database: %s", extension.Name, err.Error())
 			recorder.Event(database, "Normal", "error", msg)
 			infrav1beta1.ExtensionNotReadyCondition(database, infrav1beta1.CreateExtensionFailedReason, msg)
@@ -148,7 +156,7 @@ func reconcileDatabase(c client.Client, pool *db.ClientPool, invoke db.Invoke, d
 	return database, ctrl.Result{}
 }
 
-func reconcileUser(database database, c client.Client, pool *db.ClientPool, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result) {
+func reconcileUser(database database, c client.Client, invoke db.Invoke, user user, recorder record.EventRecorder) (user, ctrl.Result) {
 	// Fetch referencing database
 	databaseName := types.NamespacedName{
 		Namespace: user.GetNamespace(),
@@ -163,6 +171,12 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		infrav1beta1.UserNotReadyCondition(user, v1beta1.DatabaseNotFoundReason, msg)
 		return user, ctrl.Result{Requeue: true}
 	}
+
+	if database.GetAtlasGroupId() != "" {
+		return reconcileAtlasUser(database, c, user, recorder)
+	}
+
+	ctx := context.TODO()
 
 	// Fetch referencing root secret
 	secret := &corev1.Secret{}
@@ -189,7 +203,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	dbHandler, err := pool.FromURI(context.TODO(), invoke, database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
+	dbHandler, err := invoke(context.TODO(), database.GetAddress(), database.GetRootDatabaseName(), usr, pw)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to setup connection to database server: %s", err.Error())
@@ -215,7 +229,7 @@ func reconcileUser(database database, c client.Client, pool *db.ClientPool, invo
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	err = dbHandler.SetupUser(database.GetDatabaseName(), usr, pw, extractRoles(user.GetRoles()))
+	err = dbHandler.SetupUser(ctx, database.GetDatabaseName(), usr, pw, extractRoles(user.GetRoles()))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
