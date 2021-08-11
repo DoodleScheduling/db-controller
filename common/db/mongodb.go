@@ -10,27 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
 const (
 	adminDatabase   = "admin"
 	usersCollection = "system.users"
 )
-
-type Roles []Role
-type Role struct {
-	Role string `json:"role" bson:"role"`
-	DB   string `json:"db" bson:"db"`
-}
-
-type Users []User
-type User struct {
-	User  string `json:"user" bson:"user"`
-	DB    string `json:"db" bson:"db"`
-	Roles Roles  `json:"roles" bson:"roles"`
-}
 
 type MongoDBRepository struct {
 	client *mongo.Client
@@ -70,7 +55,7 @@ func (m *MongoDBRepository) CreateDatabaseIfNotExists(ctx context.Context, datab
 	return nil
 }
 
-func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles Roles) error {
 	doesUserExist, err := m.doesUserExist(ctx, database, username)
 	if err != nil {
 		return err
@@ -139,7 +124,7 @@ func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, us
 	return users, nil
 }
 
-func (m *MongoDBRepository) getRoles(database string, roles []infrav1beta1.Role) []bson.M {
+func (m *MongoDBRepository) getRoles(database string, roles Roles) []bson.M {
 	// by default, assign readWrite role (backward compatibility)
 	if len(roles) == 0 {
 		return []bson.M{{
@@ -149,7 +134,7 @@ func (m *MongoDBRepository) getRoles(database string, roles []infrav1beta1.Role)
 	}
 	rs := make([]bson.M, 0)
 	for _, r := range roles {
-		db := r.Db
+		db := r.DB
 		if db == "" {
 			db = database
 		}
@@ -162,7 +147,7 @@ func (m *MongoDBRepository) getRoles(database string, roles []infrav1beta1.Role)
 	return rs
 }
 
-func (m *MongoDBRepository) createUser(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *MongoDBRepository) createUser(ctx context.Context, database string, username string, password string, roles Roles) error {
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)
@@ -172,7 +157,7 @@ func (m *MongoDBRepository) createUser(ctx context.Context, database string, use
 	return nil
 }
 
-func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles Roles) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)

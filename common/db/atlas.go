@@ -6,8 +6,6 @@ import (
 
 	"github.com/mongodb-forks/digest"
 	"go.mongodb.org/atlas/mongodbatlas"
-
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
 type AtlasRepository struct {
@@ -38,7 +36,7 @@ func (m *AtlasRepository) CreateDatabaseIfNotExists(ctx context.Context, databas
 	return nil
 }
 
-func (m *AtlasRepository) SetupUser(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *AtlasRepository) SetupUser(ctx context.Context, database string, username string, password string, roles Roles) error {
 	doesUserExist, err := m.doesUserExist(ctx, database, username)
 	if err != nil {
 		return err
@@ -81,7 +79,7 @@ func (m *AtlasRepository) doesUserExist(ctx context.Context, database string, us
 	return true, err
 }
 
-func (m *AtlasRepository) getRoles(database string, roles []infrav1beta1.Role) []mongodbatlas.Role {
+func (m *AtlasRepository) getRoles(database string, roles Roles) []mongodbatlas.Role {
 	// by default, assign readWrite role (backward compatibility)
 	if len(roles) == 0 {
 		return []mongodbatlas.Role{{
@@ -92,7 +90,7 @@ func (m *AtlasRepository) getRoles(database string, roles []infrav1beta1.Role) [
 
 	rs := make([]mongodbatlas.Role, 0)
 	for _, r := range roles {
-		db := r.Db
+		db := r.DB
 		if db == "" {
 			db = database
 		}
@@ -106,7 +104,7 @@ func (m *AtlasRepository) getRoles(database string, roles []infrav1beta1.Role) [
 	return rs
 }
 
-func (m *AtlasRepository) createUser(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *AtlasRepository) createUser(ctx context.Context, database string, username string, password string, roles Roles) error {
 	user := &mongodbatlas.DatabaseUser{
 		Username:     username,
 		Password:     password,
@@ -122,7 +120,7 @@ func (m *AtlasRepository) createUser(ctx context.Context, database string, usern
 	return nil
 }
 
-func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles []infrav1beta1.Role) error {
+func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles Roles) error {
 	user := &mongodbatlas.DatabaseUser{
 		Username: username,
 		Password: password,

@@ -76,7 +76,7 @@ type Role struct {
 	Name string `json:"name"`
 
 	// +optional
-	Db string `json:"db,omitempty"`
+	DB string `json:"db,omitempty"`
 }
 
 // Extension is a resource representing database extension

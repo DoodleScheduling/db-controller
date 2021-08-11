@@ -133,7 +133,7 @@ func reconcileAtlasUser(database database, c client.Client, user user, recorder 
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	err = dbHandler.SetupUser(ctx, database.GetDatabaseName(), usr, pw, user.GetRoles())
+	err = dbHandler.SetupUser(ctx, database.GetDatabaseName(), usr, pw, extractRoles(user.GetRoles()))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)

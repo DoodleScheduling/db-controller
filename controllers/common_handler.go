@@ -53,6 +53,18 @@ func objectKey(object metav1.Object) client.ObjectKey {
 	}
 }
 
+func extractRoles(roles []infrav1beta1.Role) db.Roles {
+	list := make(db.Roles, 0)
+	for _, r := range roles {
+		list = append(list, db.Role{
+			Name: r.Name,
+			DB:   r.DB,
+		})
+	}
+
+	return list
+}
+
 func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev1.Secret) (string, string, error) {
 	var (
 		user string
@@ -217,7 +229,7 @@ func reconcileUser(database database, c client.Client, invoke db.Invoke, user us
 		return user, ctrl.Result{Requeue: true}
 	}
 
-	err = dbHandler.SetupUser(ctx, database.GetDatabaseName(), usr, pw, user.GetRoles())
+	err = dbHandler.SetupUser(ctx, database.GetDatabaseName(), usr, pw, extractRoles(user.GetRoles()))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to provison user account: %s", err.Error())
 		recorder.Event(user, "Normal", "error", msg)
