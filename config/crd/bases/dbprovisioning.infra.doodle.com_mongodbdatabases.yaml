@@ -51,6 +51,8 @@ spec:
               address:
                 description: The connect URI
                 type: string
+              atlasGroupId:
+                type: string
               databaseName:
                 description: DatabaseName is by default the same as metata.name
                 type: string
@@ -83,7 +85,6 @@ spec:
                 - name
                 type: object
             required:
-            - address
             - rootSecret
             type: object
           status:

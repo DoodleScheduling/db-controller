@@ -68,9 +68,9 @@ func (in *PostgreSQLUser) GetCredentials() *SecretReference {
 	return in.Spec.Credentials
 }
 
-func (in *PostgreSQLUser) GetRoles() *[]Role {
+func (in *PostgreSQLUser) GetRoles() []Role {
 	// NOOP
-	return nil
+	return []Role{}
 }
 
 // +kubebuilder:object:root=true

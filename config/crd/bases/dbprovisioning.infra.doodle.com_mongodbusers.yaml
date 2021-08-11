@@ -80,6 +80,8 @@ spec:
                 - name: readWrite
                 items:
                   properties:
+                    db:
+                      type: string
                     name:
                       type: string
                   required:

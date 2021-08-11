@@ -17,19 +17,6 @@ const (
 	usersCollection = "system.users"
 )
 
-type Roles []Role
-type Role struct {
-	Role string `json:"role" bson:"role"`
-	DB   string `json:"db" bson:"db"`
-}
-
-type Users []User
-type User struct {
-	User  string `json:"user" bson:"user"`
-	DB    string `json:"db" bson:"db"`
-	Roles Roles  `json:"roles" bson:"roles"`
-}
-
 type MongoDBRepository struct {
 	client *mongo.Client
 }
@@ -58,35 +45,33 @@ func NewMongoDBRepository(ctx context.Context, uri, database, username, password
 	}, nil
 }
 
-func (m *MongoDBRepository) Close() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func (m *MongoDBRepository) Close(ctx context.Context) error {
 	return m.client.Disconnect(ctx)
 }
 
 // CreateDatabaseIfNotExists is a dummy to apply to fulfill the contract,
 // we don't need to create the database on MongoDB
-func (m *MongoDBRepository) CreateDatabaseIfNotExists(database string) error {
+func (m *MongoDBRepository) CreateDatabaseIfNotExists(ctx context.Context, database string) error {
 	return nil
 }
 
-func (m *MongoDBRepository) SetupUser(database string, username string, password string, roles []string) error {
-	doesUserExist, err := m.doesUserExist(database, username)
+func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles Roles) error {
+	doesUserExist, err := m.doesUserExist(ctx, database, username)
 	if err != nil {
 		return err
 	}
 
 	if !doesUserExist {
-		if err := m.createUser(database, username, password, roles); err != nil {
+		if err := m.createUser(ctx, database, username, password, roles); err != nil {
 			return err
 		}
-		if doesUserExistNow, err := m.doesUserExist(database, username); err != nil {
+		if doesUserExistNow, err := m.doesUserExist(ctx, database, username); err != nil {
 			return err
 		} else if !doesUserExistNow {
 			return errors.New("user doesn't exist after create")
 		}
 	} else {
-		if err := m.updateUserPasswordAndRoles(database, username, password, roles); err != nil {
+		if err := m.updateUserPasswordAndRoles(ctx, database, username, password, roles); err != nil {
 			return err
 		}
 	}
@@ -94,22 +79,22 @@ func (m *MongoDBRepository) SetupUser(database string, username string, password
 	return nil
 }
 
-func (m *MongoDBRepository) DropUser(database string, username string) error {
+func (m *MongoDBRepository) DropUser(ctx context.Context, database string, username string) error {
 	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
-	r := m.runCommand(database, command)
+	r := m.runCommand(ctx, database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *MongoDBRepository) EnableExtension(name string) error {
+func (m *MongoDBRepository) EnableExtension(ctx context.Context, name string) error {
 	// NOOP
 	return nil
 }
 
-func (m *MongoDBRepository) doesUserExist(database string, username string) (bool, error) {
-	users, err := m.getAllUsers(database, username)
+func (m *MongoDBRepository) doesUserExist(ctx context.Context, database string, username string) (bool, error) {
+	users, err := m.getAllUsers(ctx, database, username)
 	if err != nil {
 		return false, err
 	}
@@ -117,10 +102,8 @@ func (m *MongoDBRepository) doesUserExist(database string, username string) (boo
 	return users != nil && len(users) > 0, nil
 }
 
-func (m *MongoDBRepository) getAllUsers(database string, username string) (Users, error) {
+func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, username string) (Users, error) {
 	users := make(Users, 0)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	collection := m.client.Database(adminDatabase).Collection(usersCollection)
 	cursor, err := collection.Find(ctx, bson.D{primitive.E{Key: "user", Value: username}, primitive.E{Key: "db", Value: database}})
@@ -141,9 +124,9 @@ func (m *MongoDBRepository) getAllUsers(database string, username string) (Users
 	return users, nil
 }
 
-func (m *MongoDBRepository) getRoles(database string, roles []string) []bson.M {
+func (m *MongoDBRepository) getRoles(database string, roles Roles) []bson.M {
 	// by default, assign readWrite role (backward compatibility)
-	if roles == nil || len(roles) == 0 {
+	if len(roles) == 0 {
 		return []bson.M{{
 			"role": "readWrite",
 			"db":   database,
@@ -151,36 +134,39 @@ func (m *MongoDBRepository) getRoles(database string, roles []string) []bson.M {
 	}
 	rs := make([]bson.M, 0)
 	for _, r := range roles {
+		db := r.DB
+		if db == "" {
+			db = database
+		}
+
 		rs = append(rs, bson.M{
-			"role": r,
-			"db":   database,
+			"role": r.Name,
+			"db":   db,
 		})
 	}
 	return rs
 }
 
-func (m *MongoDBRepository) createUser(database string, username string, password string, roles []string) error {
+func (m *MongoDBRepository) createUser(ctx context.Context, database string, username string, password string, roles Roles) error {
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
-	r := m.runCommand(database, command)
+	r := m.runCommand(ctx, database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *MongoDBRepository) updateUserPasswordAndRoles(database string, username string, password string, roles []string) error {
+func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles Roles) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
-	r := m.runCommand(database, command)
+	r := m.runCommand(ctx, database, command)
 	if _, err := r.DecodeBytes(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *MongoDBRepository) runCommand(database string, command *bson.D) *mongo.SingleResult {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func (m *MongoDBRepository) runCommand(ctx context.Context, database string, command *bson.D) *mongo.SingleResult {
 	return m.client.Database(database).RunCommand(ctx, *command)
 }
