@@ -67,6 +67,59 @@ spec:
                   - name
                   type: object
                 type: array
+              migration:
+                description: Configure database migration
+                properties:
+                  address:
+                    description: The connect URI, by default the same as spec.address.
+                      Note at least the databaseName or address have to differ from
+                      spec.databaseName or spec.address.
+                    type: string
+                  databaseName:
+                    description: DatabaseName is by default the same as metata.name
+                      or if set spec.databaseName
+                    type: string
+                  rootSecret:
+                    description: Contains a credentials set of a user with enough
+                      permission to manage databases and user accounts
+                    properties:
+                      name:
+                        description: Name referrs to the name of the secret, must
+                          be located whithin the same namespace
+                        type: string
+                      passwordField:
+                        default: password
+                        type: string
+                      userField:
+                        default: username
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  workloads:
+                    description: Configure workloads which are scaled to 0 before
+                      the migration
+                    items:
+                      description: Workload reference
+                      properties:
+                        kind:
+                          description: Kind of workload type, Deployment, StatefulSet,
+                            ReplicaSet
+                          type: string
+                        name:
+                          description: Name of workload
+                          type: string
+                        replicas:
+                          description: Scale to the the number of replicas after successful
+                            migration. If left empty it will automatically be aligned
+                            with the replicas configured on the reffered workload
+                          type: integer
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    type: array
+                type: object
               rootSecret:
                 description: Contains a credentials set of a user with enough permission
                   to manage databases and user accounts

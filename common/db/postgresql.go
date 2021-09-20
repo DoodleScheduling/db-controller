@@ -19,15 +19,15 @@ const (
 	DefaultPostgreSQLReadWriteRole = "readWrite"
 )
 
-func NewPostgreSQLRepository(ctx context.Context, uri, database, username, password string) (Handler, error) {
-	opt, err := url.Parse(uri)
+func NewPostgreSQLRepository(ctx context.Context, opts ConnectionOptions) (Handler, error) {
+	popt, err := url.Parse(opts.URI)
 	if err != nil {
 		return nil, err
 	}
 
-	opt.User = url.UserPassword(username, password)
+	popt.User = url.UserPassword(opts.Username, opts.Password)
 
-	q, _ := url.ParseQuery(opt.RawQuery)
+	q, _ := url.ParseQuery(popt.RawQuery)
 	hasConnectTimeout := false
 	for k, _ := range q {
 		if k == "connect_timeout" {
@@ -40,13 +40,13 @@ func NewPostgreSQLRepository(ctx context.Context, uri, database, username, passw
 		q.Add("connect_timeout", "2")
 	}
 
-	opt.RawQuery = q.Encode()
+	popt.RawQuery = q.Encode()
 
-	if database != "" {
-		opt.Path = database
+	if opts.DatabaseName != "" {
+		popt.Path = opts.DatabaseName
 	}
 
-	dbpool, err := pgxpool.Connect(ctx, opt.String())
+	dbpool, err := pgxpool.Connect(ctx, popt.String())
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +59,10 @@ func NewPostgreSQLRepository(ctx context.Context, uri, database, username, passw
 func (s *PostgreSQLRepository) Close(ctx context.Context) error {
 	s.dbpool.Close()
 	return nil
+}
+
+func (s *PostgreSQLRepository) RestoreDatabaseFrom(ctx context.Context, source ConnectionOptions) error {
+	return errors.New("not yet implemented")
 }
 
 // TODO Prepared Statements

@@ -30,6 +30,10 @@ func (m *AtlasRepository) Close(ctx context.Context) error {
 	return nil
 }
 
+func (s *AtlasRepository) RestoreDatabaseFrom(ctx context.Context, source ConnectionOptions) error {
+	return errors.New("not yet implemented")
+}
+
 // CreateDatabaseIfNotExists is a dummy to apply to fulfill the contract,
 // we don't need to create the database on Atlas
 func (m *AtlasRepository) CreateDatabaseIfNotExists(ctx context.Context, database string) error {

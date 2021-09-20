@@ -78,6 +78,58 @@ func (in *MongoDBDatabase) GetDatabaseName() string {
 	return in.GetName()
 }
 
+func (in *MongoDBDatabase) MigrationRequired() bool {
+	if in.Spec.Migration == nil {
+		return false
+	}
+
+	return true
+}
+
+func (in *MongoDBDatabase) GetMigrationAddress() string {
+	if in.Spec.Migration == nil {
+		return ""
+	}
+
+	if in.Spec.Migration.Address == "" {
+		return in.Spec.Address
+	}
+
+	return in.Spec.Migration.Address
+}
+
+func (in *MongoDBDatabase) GetMigrationRootSecret() *SecretReference {
+	if in.Spec.Migration == nil {
+		return nil
+	}
+
+	if in.Spec.Migration.RootSecret == nil {
+		return in.GetRootSecret()
+	}
+
+	return in.Spec.Migration.RootSecret
+}
+
+func (in *MongoDBDatabase) GetMigrationDatabaseName() string {
+	if in.Spec.Migration == nil {
+		return ""
+	}
+
+	if in.Spec.Migration.DatabaseName == "" {
+		return in.GetDatabaseName()
+	}
+
+	return in.Spec.Migration.DatabaseName
+}
+
+func (in *MongoDBDatabase) GetMigrationWorkloads() []WorkloadReference {
+	if in.Spec.Migration == nil {
+		return []WorkloadReference{}
+	}
+
+	return in.Spec.Migration.Workloads
+}
+
 func (in *MongoDBDatabase) GetRootDatabaseName() string {
 	return ""
 }
