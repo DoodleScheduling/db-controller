@@ -58,15 +58,11 @@ type MongoDBDatabase struct {
 	Status MongoDBDatabaseStatus `json:"status,omitempty"`
 }
 
-func (in *MongoDBDatabase) GetAtlasGroupId() string {
-	return in.Spec.AtlasGroupId
-}
-
-func (in *MongoDBDatabase) GetAddress() string {
-	return in.Spec.Address
-}
-
 func (in *MongoDBDatabase) GetRootSecret() *SecretReference {
+	if in.Spec.RootSecret.Namespace == "" {
+		in.Spec.RootSecret.Namespace = in.GetNamespace()
+	}
+
 	return in.Spec.RootSecret
 }
 
@@ -127,15 +123,20 @@ func (in *MongoDBDatabase) GetMigrationWorkloads() []WorkloadReference {
 		return []WorkloadReference{}
 	}
 
-	return in.Spec.Migration.Workloads
+	var workloads []WorkloadReference
+	for _, wl := range in.Spec.Migration.Workloads {
+		if wl.Namespace == "" {
+			wl.Namespace = in.GetNamespace()
+		}
+
+		workloads = append(workloads, wl)
+	}
+
+	return workloads
 }
 
 func (in *MongoDBDatabase) GetRootDatabaseName() string {
 	return ""
-}
-
-func (in *MongoDBDatabase) GetExtensions() Extensions {
-	return in.Spec.Extensions
 }
 
 // +kubebuilder:object:root=true

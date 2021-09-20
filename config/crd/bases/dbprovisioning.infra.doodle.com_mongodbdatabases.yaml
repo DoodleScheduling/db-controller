@@ -56,17 +56,6 @@ spec:
               databaseName:
                 description: DatabaseName is by default the same as metata.name
                 type: string
-              extensions:
-                description: Database extensions
-                items:
-                  description: Extension is a resource representing database extension
-                  properties:
-                    name:
-                      type: string
-                  required:
-                  - name
-                  type: object
-                type: array
               migration:
                 description: Configure database migration
                 properties:
@@ -86,6 +75,9 @@ spec:
                       name:
                         description: Name referrs to the name of the secret, must
                           be located whithin the same namespace
+                        type: string
+                      namespace:
+                        description: Namespace, by default the same namespace is used.
                         type: string
                       passwordField:
                         default: password
@@ -109,10 +101,14 @@ spec:
                         name:
                           description: Name of workload
                           type: string
+                        namespace:
+                          description: Namespace, by default use the same samespace
+                          type: string
                         replicas:
                           description: Scale to the the number of replicas after successful
                             migration. If left empty it will automatically be aligned
                             with the replicas configured on the reffered workload
+                          format: int32
                           type: integer
                       required:
                       - kind
@@ -127,6 +123,9 @@ spec:
                   name:
                     description: Name referrs to the name of the secret, must be located
                       whithin the same namespace
+                    type: string
+                  namespace:
+                    description: Namespace, by default the same namespace is used.
                     type: string
                   passwordField:
                     default: password

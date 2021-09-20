@@ -55,6 +55,9 @@ spec:
                     description: Name referrs to the name of the secret, must be located
                       whithin the same namespace
                     type: string
+                  namespace:
+                    description: Namespace, by default the same namespace is used.
+                    type: string
                   passwordField:
                     default: password
                     type: string

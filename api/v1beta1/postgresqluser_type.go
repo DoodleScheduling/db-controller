@@ -65,12 +65,12 @@ func (in *PostgreSQLUser) GetDatabase() string {
 }
 
 func (in *PostgreSQLUser) GetCredentials() *SecretReference {
-	return in.Spec.Credentials
-}
+	sec := in.Spec.Credentials
+	if sec.Namespace == "" {
+		sec.Namespace = in.GetNamespace()
+	}
 
-func (in *PostgreSQLUser) GetRoles() []Role {
-	// NOOP
-	return []Role{}
+	return sec
 }
 
 // +kubebuilder:object:root=true

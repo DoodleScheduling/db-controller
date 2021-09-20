@@ -1,4 +1,4 @@
-package db
+package database
 
 import (
 	"context"
@@ -18,6 +18,27 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
+type MongoDBOptions struct {
+	URI              string
+	DatabaseName     string
+	AuthDatabaseName string
+	Username         string
+	Password         string
+}
+
+type MongoDBRoles []MongoDBRole
+type MongoDBRole struct {
+	Name string `json:"role" bson:"role"`
+	DB   string `json:"db" bson:"db"`
+}
+
+type MongoDBUsers []MongoDBUser
+type MongoDBUser struct {
+	User  string       `json:"user" bson:"user"`
+	DB    string       `json:"db" bson:"db"`
+	Roles MongoDBRoles `json:"roles" bson:"roles"`
+}
+
 const (
 	adminDatabase   = "admin"
 	usersCollection = "system.users"
@@ -25,10 +46,10 @@ const (
 
 type MongoDBRepository struct {
 	client *mongo.Client
-	opts   ConnectionOptions
+	opts   MongoDBOptions
 }
 
-func NewMongoDBRepository(ctx context.Context, opts ConnectionOptions) (Handler, error) {
+func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRepository, error) {
 	o := options.Client()
 	o.SetConnectTimeout(time.Duration(2) * time.Second)
 	o.ApplyURI(opts.URI)
@@ -59,7 +80,7 @@ type mdump struct {
 	databaseName string
 }
 
-func toMongoToolsOpts(opts *ConnectionOptions) *toolsoptions.ToolOptions {
+func toMongoToolsOpts(opts *MongoDBOptions) *toolsoptions.ToolOptions {
 	return &toolsoptions.ToolOptions{
 		URI: &toolsoptions.URI{ConnectionString: opts.URI},
 		Auth: &toolsoptions.Auth{
@@ -74,7 +95,7 @@ func toMongoToolsOpts(opts *ConnectionOptions) *toolsoptions.ToolOptions {
 }
 
 // Restore database from another database
-func (m *MongoDBRepository) RestoreDatabaseFrom(ctx context.Context, src ConnectionOptions) error {
+func (m *MongoDBRepository) RestoreDatabaseFrom(ctx context.Context, src MongoDBOptions) error {
 	dbs, err := m.client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		return err
@@ -224,13 +245,7 @@ func (m *MongoDBRepository) Close(ctx context.Context) error {
 	return m.client.Disconnect(ctx)
 }
 
-// CreateDatabaseIfNotExists is a dummy to apply to fulfill the contract,
-// we don't need to create the database on MongoDB
-func (m *MongoDBRepository) CreateDatabaseIfNotExists(ctx context.Context, database string) error {
-	return nil
-}
-
-func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	doesUserExist, err := m.doesUserExist(ctx, database, username)
 	if err != nil {
 		return err
@@ -263,11 +278,6 @@ func (m *MongoDBRepository) DropUser(ctx context.Context, database string, usern
 	return nil
 }
 
-func (m *MongoDBRepository) EnableExtension(ctx context.Context, name string) error {
-	// NOOP
-	return nil
-}
-
 func (m *MongoDBRepository) doesUserExist(ctx context.Context, database string, username string) (bool, error) {
 	users, err := m.getAllUsers(ctx, database, username)
 	if err != nil {
@@ -277,8 +287,8 @@ func (m *MongoDBRepository) doesUserExist(ctx context.Context, database string, 
 	return users != nil && len(users) > 0, nil
 }
 
-func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, username string) (Users, error) {
-	users := make(Users, 0)
+func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, username string) (MongoDBUsers, error) {
+	users := make(MongoDBUsers, 0)
 
 	collection := m.client.Database(adminDatabase).Collection(usersCollection)
 	cursor, err := collection.Find(ctx, bson.D{primitive.E{Key: "user", Value: username}, primitive.E{Key: "db", Value: database}})
@@ -289,7 +299,7 @@ func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, us
 	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
-		var user User
+		var user MongoDBUser
 		if err := cursor.Decode(&user); err != nil {
 			return users, err
 		}
@@ -299,7 +309,7 @@ func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, us
 	return users, nil
 }
 
-func (m *MongoDBRepository) getRoles(database string, roles Roles) []bson.M {
+func (m *MongoDBRepository) getRoles(database string, roles MongoDBRoles) []bson.M {
 	// by default, assign readWrite role (backward compatibility)
 	if len(roles) == 0 {
 		return []bson.M{{
@@ -322,7 +332,7 @@ func (m *MongoDBRepository) getRoles(database string, roles Roles) []bson.M {
 	return rs
 }
 
-func (m *MongoDBRepository) createUser(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *MongoDBRepository) createUser(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)
@@ -332,7 +342,7 @@ func (m *MongoDBRepository) createUser(ctx context.Context, database string, use
 	return nil
 }
 
-func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)

@@ -21,9 +21,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Extension is a resource representing database extension
+type Extension struct {
+	Name string `json:"name"`
+}
+
+// Extensions is a collection of Extension types
+type Extensions []Extension
+
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
+
+	// Database extensions
+	// +optional
+	Extensions Extensions `json:"extensions,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -57,15 +69,11 @@ type PostgreSQLDatabase struct {
 	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
 }
 
-func (in *PostgreSQLDatabase) GetAtlasGroupId() string {
-	return ""
-}
-
-func (in *PostgreSQLDatabase) GetAddress() string {
-	return in.Spec.Address
-}
-
 func (in *PostgreSQLDatabase) GetRootSecret() *SecretReference {
+	if in.Spec.RootSecret.Namespace == "" {
+		in.Spec.RootSecret.Namespace = in.GetNamespace()
+	}
+
 	return in.Spec.RootSecret
 }
 
@@ -133,10 +141,6 @@ func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
 	return ""
 }
 
-func (in *PostgreSQLDatabase) GetExtensions() Extensions {
-	return in.Spec.Extensions
-}
-
 // +kubebuilder:object:root=true
 
 // PostgreSQLDatabaseList contains a list of PostgreSQLDatabase
@@ -172,6 +176,10 @@ func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() err
 		return true, updateF()
 	}
 	return true, nil
+}
+
+func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func (d *PostgreSQLDatabase) SetDefaults() error {

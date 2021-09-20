@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/db"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
 // PostgreSQLUserReconciler reconciles a PostgreSQLUser object
@@ -99,7 +100,7 @@ func (r *PostgreSQLUserReconciler) requestsForSecretChange(o client.Object) []re
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a postgresqluser change detected, reconcile", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a postgresqluser change detected", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
@@ -175,8 +176,16 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		log.Info("Error while cleaning garbage", "error", err)
 	}*/
 
-	var database infrav1beta1.PostgreSQLDatabase
-	_, result := reconcileUser(&database, r.Client, db.NewPostgreSQLRepository, &user, r.Recorder)
+	user, err := r.reconcileUser(ctx, user, r.Recorder)
+
+	if err != nil {
+		r.Recorder.Event(&user, "Normal", "error", err.Error())
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	msg := "User successfully provisioned"
+	r.Recorder.Event(&user, "Normal", "info", msg)
+	infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
@@ -184,7 +193,54 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return result, nil
+	return ctrl.Result{}, nil
+}
+
+func (r *PostgreSQLUserReconciler) reconcileUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, recorder record.EventRecorder) (infrav1beta1.PostgreSQLUser, error) {
+	var db infrav1beta1.PostgreSQLDatabase
+	databaseName := types.NamespacedName{
+		Namespace: user.GetNamespace(),
+		Name:      user.GetDatabase(),
+	}
+
+	err := r.Client.Get(ctx, databaseName, &db)
+	if err != nil {
+		err = fmt.Errorf("Referencing database was not found: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
+		return user, err
+	}
+
+	// Fetch referencing root secret
+	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return user, err
+	}
+
+	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw)
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	// Fetch referencing secret
+	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return user, err
+	}
+
+	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw)
+	if err != nil {
+		err = fmt.Errorf("Failed to provison user account: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	return user, nil
 }
 
 func (r *PostgreSQLUserReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLUser) error {

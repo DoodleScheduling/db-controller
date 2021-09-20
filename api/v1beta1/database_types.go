@@ -49,10 +49,6 @@ type DatabaseSpec struct {
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
 
-	// Database extensions
-	// +optional
-	Extensions Extensions `json:"extensions,omitempty"`
-
 	// Configure database migration
 	// +optional
 	Migration *Migration `json:"migration,omitempty"`
@@ -87,6 +83,10 @@ type WorkloadReference struct {
 	// +required
 	Name string `json:"name"`
 
+	// Namespace, by default use the same samespace
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
 	// Scale to the the number of replicas after successful migration. If left empty it will automatically be aligned with the replicas configured on the reffered workload
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
@@ -105,6 +105,10 @@ type SecretReference struct {
 	// +required
 	Name string `json:"name"`
 
+	// Namespace, by default the same namespace is used.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
 	// +optional
 	// +kubebuilder:default:=username
 	UserField string `json:"userField"`
@@ -113,21 +117,6 @@ type SecretReference struct {
 	// +kubebuilder:default:=password
 	PasswordField string `json:"passwordField"`
 }
-
-type Role struct {
-	Name string `json:"name"`
-
-	// +optional
-	DB string `json:"db,omitempty"`
-}
-
-// Extension is a resource representing database extension
-type Extension struct {
-	Name string `json:"name"`
-}
-
-// Extensions is a collection of Extension types
-type Extensions []Extension
 
 // conditionalResource is a resource with conditions
 type conditionalResource interface {
@@ -140,10 +129,6 @@ func DatabaseNotReadyCondition(in conditionalResource, reason, message string) {
 
 func DatabaseReadyCondition(in conditionalResource, reason, message string) {
 	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionTrue, reason, message)
-}
-
-func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
-	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func UserNotReadyCondition(in conditionalResource, reason, message string) {

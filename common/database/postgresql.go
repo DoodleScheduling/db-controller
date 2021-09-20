@@ -1,4 +1,4 @@
-package db
+package database
 
 import (
 	"context"
@@ -10,6 +10,13 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+type PostgreSQLOptions struct {
+	URI          string
+	DatabaseName string
+	Username     string
+	Password     string
+}
+
 type PostgreSQLRepository struct {
 	dbpool *pgxpool.Pool
 }
@@ -19,7 +26,7 @@ const (
 	DefaultPostgreSQLReadWriteRole = "readWrite"
 )
 
-func NewPostgreSQLRepository(ctx context.Context, opts ConnectionOptions) (Handler, error) {
+func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*PostgreSQLRepository, error) {
 	popt, err := url.Parse(opts.URI)
 	if err != nil {
 		return nil, err
@@ -61,10 +68,6 @@ func (s *PostgreSQLRepository) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *PostgreSQLRepository) RestoreDatabaseFrom(ctx context.Context, source ConnectionOptions) error {
-	return errors.New("not yet implemented")
-}
-
 // TODO Prepared Statements
 func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(ctx context.Context, database string) error {
 	if databaseExists, err := s.doesDatabaseExist(ctx, database); err != nil {
@@ -89,7 +92,7 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(ctx context.Context, da
 	}
 }
 
-func (s *PostgreSQLRepository) SetupUser(ctx context.Context, database string, user string, password string, roles Roles) error {
+func (s *PostgreSQLRepository) SetupUser(ctx context.Context, database string, user string, password string) error {
 	if err := s.createUserIfNotExists(ctx, user); err != nil {
 		return err
 	}
@@ -112,11 +115,11 @@ func (s *PostgreSQLRepository) DropUser(ctx context.Context, database string, us
 	return nil
 }
 
-func (s *PostgreSQLRepository) EnableExtension(ctx context.Context, name string) error {
-	if extensionExists, err := s.doesExtensionExist(ctx, name); err != nil {
+func (s *PostgreSQLRepository) EnableExtension(ctx context.Context, db, name string) error {
+	if extensionExists, err := s.doesExtensionExist(ctx, db, name); err != nil {
 		return err
 	} else if !extensionExists {
-		return s.createExtension(ctx, name)
+		return s.createExtension(ctx, db, name)
 	}
 	return nil
 }
@@ -144,7 +147,7 @@ func (s *PostgreSQLRepository) createUserIfNotExists(ctx context.Context, user s
 	}
 }
 
-func (s *PostgreSQLRepository) createExtension(ctx context.Context, name string) error {
+func (s *PostgreSQLRepository) createExtension(ctx context.Context, db, name string) error {
 	_, err := s.dbpool.Exec(ctx, fmt.Sprintf("CREATE EXTENSION %s;", name))
 	return err
 }
@@ -217,7 +220,7 @@ func (s *PostgreSQLRepository) doesUserExist(ctx context.Context, user string) (
 	return result == 1, nil
 }
 
-func (s *PostgreSQLRepository) doesExtensionExist(ctx context.Context, name string) (bool, error) {
+func (s *PostgreSQLRepository) doesExtensionExist(ctx context.Context, db, name string) (bool, error) {
 	var result int64
 	err := s.dbpool.QueryRow(ctx, fmt.Sprintf("SELECT 1 from pg_extension where extname='%s';", name)).Scan(&result)
 	if err != nil {

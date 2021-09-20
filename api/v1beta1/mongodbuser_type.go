@@ -21,6 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type MongoDBUserRole struct {
+	Name string `json:"name"`
+
+	// +optional
+	DB string `json:"db,omitempty"`
+}
+
 type MongoDBUserSpec struct {
 	// +required
 	Database *DatabaseReference `json:"database"`
@@ -30,7 +37,7 @@ type MongoDBUserSpec struct {
 
 	// +optional
 	// +kubebuilder:default:={{name: readWrite}}
-	Roles *[]Role `json:"roles"`
+	Roles *[]MongoDBUserRole `json:"roles"`
 
 	// CustomData is not yet supported
 	// +optional
@@ -73,12 +80,17 @@ func (in *MongoDBUser) GetDatabase() string {
 }
 
 func (in *MongoDBUser) GetCredentials() *SecretReference {
-	return in.Spec.Credentials
+	sec := in.Spec.Credentials
+	if sec.Namespace == "" {
+		sec.Namespace = in.GetNamespace()
+	}
+
+	return sec
 }
 
-func (in *MongoDBUser) GetRoles() []Role {
+func (in *MongoDBUser) GetRoles() []MongoDBUserRole {
 	if in.Spec.Roles == nil {
-		return []Role{}
+		return []MongoDBUserRole{}
 	}
 
 	return *in.Spec.Roles

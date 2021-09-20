@@ -1,4 +1,4 @@
-package db
+package database
 
 import (
 	"context"
@@ -8,20 +8,26 @@ import (
 	"go.mongodb.org/atlas/mongodbatlas"
 )
 
+type AtlasOptions struct {
+	GroupID    string
+	PublicKey  string
+	PrivateKey string
+}
+
 type AtlasRepository struct {
 	atlas   *mongodbatlas.Client
 	groupId string
 }
 
-func NewAtlasRepository(ctx context.Context, groupId, publicKey, privateKey string) (Handler, error) {
-	t := digest.NewTransport(publicKey, privateKey)
+func NewAtlasRepository(ctx context.Context, opts AtlasOptions) (*AtlasRepository, error) {
+	t := digest.NewTransport(opts.PublicKey, opts.PrivateKey)
 	tc, err := t.Client()
 	if err != nil {
 		return nil, err
 	}
 
 	return &AtlasRepository{
-		groupId: groupId,
+		groupId: opts.GroupID,
 		atlas:   mongodbatlas.NewClient(tc),
 	}, nil
 }
@@ -30,17 +36,7 @@ func (m *AtlasRepository) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *AtlasRepository) RestoreDatabaseFrom(ctx context.Context, source ConnectionOptions) error {
-	return errors.New("not yet implemented")
-}
-
-// CreateDatabaseIfNotExists is a dummy to apply to fulfill the contract,
-// we don't need to create the database on Atlas
-func (m *AtlasRepository) CreateDatabaseIfNotExists(ctx context.Context, database string) error {
-	return nil
-}
-
-func (m *AtlasRepository) SetupUser(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *AtlasRepository) SetupUser(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	doesUserExist, err := m.doesUserExist(ctx, database, username)
 	if err != nil {
 		return err
@@ -69,11 +65,6 @@ func (m *AtlasRepository) DropUser(ctx context.Context, database string, usernam
 	return errors.New("not yet supported")
 }
 
-func (m *AtlasRepository) EnableExtension(ctx context.Context, name string) error {
-	// NOOP
-	return nil
-}
-
 func (m *AtlasRepository) doesUserExist(ctx context.Context, database string, username string) (bool, error) {
 	_, _, err := m.atlas.DatabaseUsers.Get(ctx, database, m.groupId, username)
 	if err != nil {
@@ -83,7 +74,7 @@ func (m *AtlasRepository) doesUserExist(ctx context.Context, database string, us
 	return true, err
 }
 
-func (m *AtlasRepository) getRoles(database string, roles Roles) []mongodbatlas.Role {
+func (m *AtlasRepository) getRoles(database string, roles MongoDBRoles) []mongodbatlas.Role {
 	// by default, assign readWrite role (backward compatibility)
 	if len(roles) == 0 {
 		return []mongodbatlas.Role{{
@@ -108,7 +99,7 @@ func (m *AtlasRepository) getRoles(database string, roles Roles) []mongodbatlas.
 	return rs
 }
 
-func (m *AtlasRepository) createUser(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *AtlasRepository) createUser(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	user := &mongodbatlas.DatabaseUser{
 		Username:     username,
 		Password:     password,
@@ -124,7 +115,7 @@ func (m *AtlasRepository) createUser(ctx context.Context, database string, usern
 	return nil
 }
 
-func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles Roles) error {
+func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
 	user := &mongodbatlas.DatabaseUser{
 		Username: username,
 		Password: password,

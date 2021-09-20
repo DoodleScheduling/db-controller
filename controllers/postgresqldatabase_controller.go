@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/db"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
@@ -83,7 +83,7 @@ func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) 
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a PostgreSQLDatabase changed detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a PostgreSQLDatabase changed detected", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
@@ -99,8 +99,8 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	logger.Info("reconciling PostgreSQLDatabase")
 
 	// get database resource by namespaced name
-	var database infrav1beta1.PostgreSQLDatabase
-	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
+	var db infrav1beta1.PostgreSQLDatabase
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if apierrors.IsNotFound(err) {
 			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
 			return ctrl.Result{}, nil
@@ -108,18 +108,18 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	database.SetDefaults()
+	db.SetDefaults()
 
 	// set finalizer
-	if err := database.SetFinalizer(func() error {
-		return r.Update(ctx, &database)
+	if err := db.SetFinalizer(func() error {
+		return r.Update(ctx, &db)
 	}); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// finalize
-	if finalized, err := database.Finalize(func() error {
-		return r.Update(ctx, &database)
+	if finalized, err := db.Finalize(func() error {
+		return r.Update(ctx, &db)
 	}, func() error {
 		return nil
 		//return gc.CleanFromSpec(&database)
@@ -129,15 +129,57 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return reconcile.Result{}, nil
 	}
 
-	_, result := reconcileDatabase(r.Client, db.NewPostgreSQLRepository, &database, r.Recorder)
+	db, err := r.reconcileDatabase(ctx, db, r.Recorder)
+
+	if err != nil {
+		r.Recorder.Event(&db, "Normal", "error", err.Error())
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	msg := "Database successfully provisioned"
+	r.Recorder.Event(&db, "Normal", "info", msg)
+	infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisiningSuccessfulReason, msg)
 
 	// Update status after reconciliation.
-	if err := r.patchStatus(ctx, &database); err != nil {
+	if err := r.patchStatus(ctx, &db); err != nil {
 		log.Error(err, "unable to update status after reconciliation")
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return result, nil
+	return ctrl.Result{}, nil
+}
+
+func (r *PostgreSQLDatabaseReconciler) reconcileDatabase(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, recorder record.EventRecorder) (infrav1beta1.PostgreSQLDatabase, error) {
+	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+
+	if err != nil {
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return db, err
+	}
+
+	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw)
+
+	if err != nil {
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
+		return db, err
+	}
+
+	err = dbHandler.CreateDatabaseIfNotExists(ctx, db.GetDatabaseName())
+	if err != nil {
+		err = fmt.Errorf("Failed to provision database: %w", err)
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CreateDatabaseFailedReason, err.Error())
+		return db, err
+	}
+
+	for _, ext := range db.Spec.Extensions {
+		if err := dbHandler.EnableExtension(ctx, db.GetDatabaseName(), ext.Name); err != nil {
+			err = fmt.Errorf("Failed to create extension %s in database: %w", ext.Name, err)
+			infrav1beta1.ExtensionNotReadyCondition(&db, infrav1beta1.CreateExtensionFailedReason, err.Error())
+			return db, err
+		}
+	}
+
+	return db, nil
 }
 
 func (r *PostgreSQLDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLDatabase) error {
