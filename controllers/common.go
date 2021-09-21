@@ -76,13 +76,18 @@ func setupAtlas(ctx context.Context, db infrav1beta1.MongoDBDatabase, pubKey, pr
 	return handler, nil
 }
 
-func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, usr, pw string) (*database.PostgreSQLRepository, error) {
-	handler, err := database.NewPostgreSQLRepository(context.TODO(), database.PostgreSQLOptions{
-		URI:          db.Spec.Address,
-		DatabaseName: db.GetDatabaseName(),
-		Username:     usr,
-		Password:     pw,
-	})
+func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, usr, pw string, switchDB bool) (*database.PostgreSQLRepository, error) {
+	opts := database.PostgreSQLOptions{
+		URI:      db.Spec.Address,
+		Username: usr,
+		Password: pw,
+	}
+
+	if switchDB == true {
+		opts.DatabaseName = db.GetDatabaseName()
+	}
+
+	handler, err := database.NewPostgreSQLRepository(context.TODO(), opts)
 
 	if err != nil {
 		return handler, fmt.Errorf("Failed to setup connection to postgres server: %w", err)

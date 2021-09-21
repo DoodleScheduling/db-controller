@@ -64,7 +64,10 @@ func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*Post
 }
 
 func (s *PostgreSQLRepository) Close(ctx context.Context) error {
-	s.dbpool.Close()
+	if s.dbpool != nil {
+		s.dbpool.Close()
+	}
+
 	return nil
 }
 

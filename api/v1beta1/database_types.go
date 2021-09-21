@@ -20,19 +20,19 @@ const (
 
 // Status reasons
 const (
-	SecretNotFoundReason                = "SecretNotFoundFailed"
-	ConnectionFailedReason              = "ConnectionFailed"
-	DatabaseProvisioningFailedReason    = "DatabaseProvisioningFailed"
-	DatabaseProvisiningSuccessfulReason = "DatabaseProvisiningSuccessful"
-	DatabaseNotFoundReason              = "DatabaseNotFoundReason"
-	UserNotProvisionedReason            = "UserNotProvisioned"
-	UserProvisioningSuccessfulReason    = "UserProvisioningSuccessful"
-	CredentialsNotFoundReason           = "CredentialsNotFound"
-	CreateDatabaseFailedReason          = "CreateDatabaseFailed"
-	CreateExtensionFailedReason         = "CreateExtensionFailed"
-	MigrationSuccessfulReason           = "MigrationSuccessfulReason"
-	MigrationFailedReason               = "MigrationFailedReason"
-	ProgressingReason                   = "ProgressingReason"
+	SecretNotFoundReason                 = "SecretNotFoundFailed"
+	ConnectionFailedReason               = "ConnectionFailed"
+	DatabaseProvisioningFailedReason     = "DatabaseProvisioningFailed"
+	DatabaseProvisioningSuccessfulReason = "DatabaseProvisiningSuccessful"
+	DatabaseNotFoundReason               = "DatabaseNotFoundReason"
+	UserNotProvisionedReason             = "UserNotProvisioned"
+	UserProvisioningSuccessfulReason     = "UserProvisioningSuccessful"
+	CredentialsNotFoundReason            = "CredentialsNotFound"
+	CreateDatabaseFailedReason           = "CreateDatabaseFailed"
+	CreateExtensionFailedReason          = "CreateExtensionFailed"
+	MigrationSuccessfulReason            = "MigrationSuccessfulReason"
+	MigrationFailedReason                = "MigrationFailedReason"
+	ProgressingReason                    = "ProgressingReason"
 )
 
 // DatabaseSpec defines the desired state of a *Database

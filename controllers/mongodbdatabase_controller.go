@@ -123,23 +123,23 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.Update(ctx, &db)
 	}, func() error {
 		return nil
-		//return gc.CleanFromSpec(&database)
 	}); err != nil {
 		return reconcile.Result{}, err
 	} else if finalized {
 		return reconcile.Result{}, nil
 	}
 
-	db, err := r.reconcileGenericDatabase(ctx, db, r.Recorder)
+	db, err := r.reconcile(ctx, db)
+	res := ctrl.Result{}
 
 	if err != nil {
 		r.Recorder.Event(&db, "Normal", "error", err.Error())
-		return ctrl.Result{Requeue: true}, nil
+		res = ctrl.Result{Requeue: true}
+	} else {
+		msg := "Database successfully provisioned"
+		r.Recorder.Event(&db, "Normal", "info", msg)
+		infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisioningSuccessfulReason, msg)
 	}
-
-	msg := "Database successfully provisioned"
-	r.Recorder.Event(&db, "Normal", "info", msg)
-	infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisiningSuccessfulReason, msg)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &db); err != nil {
@@ -147,10 +147,18 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
-func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase, recorder record.EventRecorder) (infrav1beta1.MongoDBDatabase, error) {
+func (r *MongoDBDatabaseReconciler) reconcile(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
+	if db.Spec.AtlasGroupId != "" {
+		return r.reconcileAtlasDatabase(ctx, db)
+	}
+
+	return r.reconcileGenericDatabase(ctx, db)
+}
+
+func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
 	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
@@ -164,6 +172,13 @@ func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context
 		if err != nil {
 			infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
 			return db, err
+		}
+
+		defer dbHandler.Close(ctx)
+
+		//If the db already exists skip migration
+		if exists, err := dbHandler.DatabaseExists(ctx, db.GetDatabaseName()); err != nil || exists == true {
+			return db, nil
 		}
 
 		srcUsername := usr
@@ -213,7 +228,7 @@ func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context
 	return db, nil
 }
 
-func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase, recorder record.EventRecorder) (infrav1beta1.MongoDBDatabase, error) {
+func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
 	pubKey, privKey, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
@@ -221,12 +236,14 @@ func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, 
 		return db, err
 	}
 
-	_, err = setupAtlas(ctx, db, pubKey, privKey)
+	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey)
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
 		return db, err
 	}
+
+	defer dbHandler.Close(ctx)
 
 	return db, nil
 }

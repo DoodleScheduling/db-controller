@@ -61,8 +61,8 @@ func (m *AtlasRepository) SetupUser(ctx context.Context, database string, userna
 }
 
 func (m *AtlasRepository) DropUser(ctx context.Context, database string, username string) error {
-	//not implemented
-	return errors.New("not yet supported")
+	_, err := m.atlas.DatabaseUsers.Delete(ctx, database, m.groupId, username)
+	return err
 }
 
 func (m *AtlasRepository) doesUserExist(ctx context.Context, database string, username string) (bool, error) {
@@ -108,11 +108,7 @@ func (m *AtlasRepository) createUser(ctx context.Context, database string, usern
 	}
 
 	_, _, err := m.atlas.DatabaseUsers.Create(ctx, m.groupId, user)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
@@ -123,9 +119,5 @@ func (m *AtlasRepository) updateUserPasswordAndRoles(ctx context.Context, databa
 	}
 
 	_, _, err := m.atlas.DatabaseUsers.Update(ctx, m.groupId, username, user)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

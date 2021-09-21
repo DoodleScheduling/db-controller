@@ -122,23 +122,23 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return r.Update(ctx, &db)
 	}, func() error {
 		return nil
-		//return gc.CleanFromSpec(&database)
 	}); err != nil {
 		return reconcile.Result{}, err
 	} else if finalized {
 		return reconcile.Result{}, nil
 	}
 
-	db, err := r.reconcileDatabase(ctx, db, r.Recorder)
+	db, err := r.reconcile(ctx, db)
+	res := ctrl.Result{}
 
 	if err != nil {
 		r.Recorder.Event(&db, "Normal", "error", err.Error())
-		return ctrl.Result{Requeue: true}, nil
+		res = ctrl.Result{Requeue: true}
+	} else {
+		msg := "Database successfully provisioned"
+		r.Recorder.Event(&db, "Normal", "info", msg)
+		infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisioningSuccessfulReason, msg)
 	}
-
-	msg := "Database successfully provisioned"
-	r.Recorder.Event(&db, "Normal", "info", msg)
-	infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisiningSuccessfulReason, msg)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &db); err != nil {
@@ -146,10 +146,10 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
-func (r *PostgreSQLDatabaseReconciler) reconcileDatabase(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, recorder record.EventRecorder) (infrav1beta1.PostgreSQLDatabase, error) {
+func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
 	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
@@ -157,19 +157,30 @@ func (r *PostgreSQLDatabaseReconciler) reconcileDatabase(ctx context.Context, db
 		return db, err
 	}
 
-	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw)
+	rootDBHandler, err := setupPostgreSQL(ctx, db, usr, pw, false)
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
 		return db, err
 	}
 
-	err = dbHandler.CreateDatabaseIfNotExists(ctx, db.GetDatabaseName())
+	defer rootDBHandler.Close(ctx)
+
+	err = rootDBHandler.CreateDatabaseIfNotExists(ctx, db.GetDatabaseName())
 	if err != nil {
 		err = fmt.Errorf("Failed to provision database: %w", err)
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CreateDatabaseFailedReason, err.Error())
 		return db, err
 	}
+
+	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw, true)
+
+	if err != nil {
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
+		return db, err
+	}
+
+	defer dbHandler.Close(ctx)
 
 	for _, ext := range db.Spec.Extensions {
 		if err := dbHandler.EnableExtension(ctx, db.GetDatabaseName(), ext.Name); err != nil {

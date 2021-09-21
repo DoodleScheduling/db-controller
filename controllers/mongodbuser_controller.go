@@ -138,12 +138,6 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	logger := r.Log.WithValues("MongoDBUser", req.NamespacedName)
 	logger.Info("reconciling MongoDBUser")
 
-	// common controller functions
-	//cw := NewControllerWrapper(*r, &ctx)
-
-	// garbage collector
-	//gc := NewMongoDBGarbageCollector(r, cw, &logger)
-
 	// get database resource by namespaced name
 	var user infrav1beta1.MongoDBUser
 	if err := r.Get(ctx, req.NamespacedName, &user); err != nil {
@@ -154,38 +148,35 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// set finalizer
-	/*if err := database.SetFinalizer(func() error {
-		return r.Update(ctx, &database)
+	if err := user.SetFinalizer(func() error {
+		return r.Update(ctx, &user)
 	}); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// finalize
-	if finalized, err := database.Finalize(func() error {
-		return r.Update(ctx, &database)
+	if finalized, err := user.Finalize(func() error {
+		return r.Update(ctx, &user)
 	}, func() error {
-		//return gc.CleanFromSpec(&database)
+		_, err := r.reconcile(ctx, user, true)
+		return err
 	}); err != nil {
 		return reconcile.Result{}, err
 	} else if finalized {
 		return reconcile.Result{}, nil
-	}*/
+	}
 
-	// Garbage Collection. If errors occur, log and proceed with reconciliation.
-	/*if err := gc.CleanFromStatus(&database); err != nil {
-		log.Info("Error while cleaning garbage", "error", err)
-	}*/
-
-	user, err := r.reconcileGenericUser(ctx, user, r.Recorder)
+	user, err := r.reconcile(ctx, user, false)
+	res := ctrl.Result{}
 
 	if err != nil {
 		r.Recorder.Event(&user, "Normal", "error", err.Error())
-		return ctrl.Result{Requeue: true}, nil
+		res = ctrl.Result{Requeue: true}
+	} else {
+		msg := "User successfully provisioned"
+		r.Recorder.Event(&user, "Normal", "info", msg)
+		infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
 	}
-
-	msg := "User successfully provisioned"
-	r.Recorder.Event(&user, "Normal", "info", msg)
-	infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
@@ -193,10 +184,10 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
-func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user infrav1beta1.MongoDBUser, recorder record.EventRecorder) (infrav1beta1.MongoDBUser, error) {
+func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1.MongoDBUser, finalize bool) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing database
 	var db infrav1beta1.MongoDBDatabase
 	databaseName := types.NamespacedName{
@@ -211,6 +202,14 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 		return user, err
 	}
 
+	if db.Spec.AtlasGroupId != "" {
+		return r.reconcileAtlasUser(ctx, user, db, finalize)
+	}
+
+	return r.reconcileGenericUser(ctx, user, db, finalize)
+}
+
+func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase, finalize bool) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
 	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
@@ -226,12 +225,25 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 		return user, err
 	}
 
+	defer dbHandler.Close(ctx)
+
 	// Fetch referencing secret
 	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
+	}
+
+	if finalize == true {
+		err = dbHandler.DropUser(ctx, db.GetDatabaseName(), usr)
+		if err != nil {
+			err = fmt.Errorf("Failed to remove user account: %w", err)
+			infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+			return user, err
+		}
+
+		return user, nil
 	}
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
@@ -244,21 +256,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 	return user, nil
 }
 
-func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user infrav1beta1.MongoDBUser, recorder record.EventRecorder) (infrav1beta1.MongoDBUser, error) {
-	// Fetch referencing database
-	var db infrav1beta1.MongoDBDatabase
-	databaseName := types.NamespacedName{
-		Namespace: user.GetNamespace(),
-		Name:      user.GetDatabase(),
-	}
-
-	err := r.Client.Get(ctx, databaseName, &db)
-	if err != nil {
-		err = fmt.Errorf("Referencing database was not found: %w", err)
-		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
-		return user, err
-	}
-
+func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase, finalize bool) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
 	pubKey, privKey, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
@@ -274,12 +272,25 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 		return user, err
 	}
 
+	defer dbHandler.Close(ctx)
+
 	// Fetch referencing secret
 	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
+	}
+
+	if finalize == true {
+		err = dbHandler.DropUser(ctx, db.GetDatabaseName(), usr)
+		if err != nil {
+			err = fmt.Errorf("Failed to remove user account: %w", err)
+			infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+			return user, err
+		}
+
+		return user, nil
 	}
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))

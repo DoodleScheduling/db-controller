@@ -94,20 +94,23 @@ func toMongoToolsOpts(opts *MongoDBOptions) *toolsoptions.ToolOptions {
 	}
 }
 
-// Restore database from another database
-func (m *MongoDBRepository) RestoreDatabaseFrom(ctx context.Context, src MongoDBOptions) error {
+func (m *MongoDBRepository) DatabaseExists(ctx context.Context, name string) (bool, error) {
 	dbs, err := m.client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	//Don't attempt a restore if the database already exists
 	for _, v := range dbs {
-		if v == m.opts.DatabaseName {
-			return nil
+		if v == name {
+			return true, nil
 		}
 	}
 
+	return false, nil
+}
+
+// Restore database from another database
+func (m *MongoDBRepository) RestoreDatabaseFrom(ctx context.Context, src MongoDBOptions) error {
 	srcOpts := toMongoToolsOpts(&src)
 	srcOpts.Namespace.DB = src.DatabaseName
 
@@ -242,7 +245,11 @@ func closePipe(r, w io.Closer, err error) error {
 }
 
 func (m *MongoDBRepository) Close(ctx context.Context) error {
-	return m.client.Disconnect(ctx)
+	if m.client != nil {
+		return m.client.Disconnect(ctx)
+	}
+
+	return nil
 }
 
 func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, username string, password string, roles MongoDBRoles) error {
