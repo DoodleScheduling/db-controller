@@ -3,14 +3,8 @@ package database
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
-	toolsoptions "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/mongodump"
-	"github.com/mongodb/mongo-tools/mongorestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -74,26 +68,6 @@ func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRep
 	}, nil
 }
 
-type mdump struct {
-	opts         *toolsoptions.ToolOptions
-	conns        int
-	databaseName string
-}
-
-func toMongoToolsOpts(opts *MongoDBOptions) *toolsoptions.ToolOptions {
-	return &toolsoptions.ToolOptions{
-		URI: &toolsoptions.URI{ConnectionString: opts.URI},
-		Auth: &toolsoptions.Auth{
-			Username: opts.Username,
-			Password: opts.Password,
-			Source:   "admin",
-		},
-		Direct:     true,
-		Connection: &toolsoptions.Connection{},
-		Namespace:  &toolsoptions.Namespace{},
-	}
-}
-
 func (m *MongoDBRepository) DatabaseExists(ctx context.Context, name string) (bool, error) {
 	dbs, err := m.client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
@@ -107,141 +81,6 @@ func (m *MongoDBRepository) DatabaseExists(ctx context.Context, name string) (bo
 	}
 
 	return false, nil
-}
-
-// Restore database from another database
-func (m *MongoDBRepository) RestoreDatabaseFrom(ctx context.Context, src MongoDBOptions) error {
-	srcOpts := toMongoToolsOpts(&src)
-	srcOpts.Namespace.DB = src.DatabaseName
-
-	dumper := &mdump{
-		databaseName: src.DatabaseName,
-		opts:         srcOpts,
-	}
-
-	//Namespace options for mongorestore to actually rename the database on the fly (regex to match all collecitions within the database)
-	nsopts := &mongorestore.NSOptions{
-		NSInclude: []string{fmt.Sprintf("%s.*", src.DatabaseName)},
-		NSFrom:    []string{fmt.Sprintf("%s.*", src.DatabaseName)},
-		NSTo:      []string{fmt.Sprintf("%s.*", m.opts.DatabaseName)},
-	}
-
-	dstOpts := toMongoToolsOpts(&m.opts)
-	return pipeMongoDBDump(ctx, dumper, dstOpts, nsopts)
-}
-
-// Write always return 0 as written bytes. Needed to satisfy io.WriteTo
-func (d *mdump) WriteTo(w io.Writer) (int64, error) {
-	//pm := progress.NewBarWriter(&progressWriter{}, time.Second*60, 24, false)
-	mdump := mongodump.MongoDump{
-		ToolOptions: d.opts,
-		OutputOptions: &mongodump.OutputOptions{
-			// Archive = "-" means, for mongodump, use the provided Writer
-			// instead of creating a file. This is not clear at plain sight,
-			// you nee to look the code to discover it.
-			Archive:                "-",
-			NumParallelCollections: 1,
-		},
-		InputOptions:    &mongodump.InputOptions{},
-		SessionProvider: &db.SessionProvider{},
-		OutputWriter:    w,
-		//ProgressManager: pm,
-	}
-
-	err := mdump.Init()
-	if err != nil {
-		return 0, fmt.Errorf("failed initialize monogdump: %w", err)
-	}
-
-	/*pm.Start()
-	defer pm.Stop()*/
-
-	err = mdump.Dump()
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to dump database: %w", err)
-	}
-
-	return 0, nil
-}
-
-// Upload writes data to dst from given src and returns an amount of written bytes
-func pipeMongoDBDump(ctx context.Context, src io.WriterTo, opts *toolsoptions.ToolOptions, nsopts *mongorestore.NSOptions) error {
-	rsession, err := db.NewSessionProvider(*opts)
-	if err != nil {
-		return fmt.Errorf("failed create session for mongorestore: %w", err)
-	}
-
-	r, w := io.Pipe()
-
-	restoreOpts := mongorestore.Options{
-		ToolOptions: opts,
-		InputOptions: &mongorestore.InputOptions{
-			Archive: "-",
-		},
-		OutputOptions: &mongorestore.OutputOptions{
-			BypassDocumentValidation: true,
-			//Drop:                     true,
-			NumParallelCollections: 1,
-			//There will be 0 documents processed if not at least set to 1
-			NumInsertionWorkers: 1,
-			StopOnError:         true,
-			BulkBufferSize:      1000,
-			WriteConcern:        "majority",
-		},
-		NSOptions: nsopts,
-	}
-
-	mr, err := mongorestore.New(restoreOpts)
-
-	if err != nil {
-		return fmt.Errorf("failed to initialize mongorestore: %w", err)
-	}
-
-	mr.InputReader = r
-	mr.SessionProvider = rsession
-
-	dumpDone := make(chan error)
-	go func() {
-		_, err := src.WriteTo(w)
-		w.Close()
-
-		dumpDone <- err
-	}()
-
-	restoreDone := make(chan error)
-	go func() {
-		rdumpResult := mr.Restore()
-		mr.Close()
-
-		if rdumpResult.Err != nil {
-			restoreDone <- fmt.Errorf("failed to restore mongo dump (successes: %d / fails: %d): %w", rdumpResult.Successes, rdumpResult.Failures, rdumpResult.Err)
-		}
-
-		restoreDone <- nil
-	}()
-
-	select {
-	case <-ctx.Done():
-		// return if passed context was closed
-		return closePipe(r, w, errors.New("context closed"))
-	case err = <-dumpDone:
-		// return error if mongodump fails
-		if err != nil {
-			return closePipe(r, w, err)
-		}
-	case err = <-restoreDone:
-		// immediately return result of mongorestore, we don't need to wait for mongodump since it either finished or failed before
-		return closePipe(r, w, err)
-	}
-
-	return nil
-}
-
-func closePipe(r, w io.Closer, err error) error {
-	r.Close()
-	w.Close()
-	return err
 }
 
 func (m *MongoDBRepository) Close(ctx context.Context) error {

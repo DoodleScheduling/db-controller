@@ -12,10 +12,9 @@ const (
 
 // Status conditions
 const (
-	DatabaseMigratedConditionType = "DatabaseMigrated"
-	DatabaseReadyConditionType    = "DatabaseReady"
-	UserReadyConditionType        = "UserReady"
-	ExtensionReadyConditionType   = "ExtensionReady"
+	DatabaseReadyConditionType  = "DatabaseReady"
+	UserReadyConditionType      = "UserReady"
+	ExtensionReadyConditionType = "ExtensionReady"
 )
 
 // Status reasons
@@ -30,8 +29,6 @@ const (
 	CredentialsNotFoundReason            = "CredentialsNotFound"
 	CreateDatabaseFailedReason           = "CreateDatabaseFailed"
 	CreateExtensionFailedReason          = "CreateExtensionFailed"
-	MigrationSuccessfulReason            = "MigrationSuccessfulReason"
-	MigrationFailedReason                = "MigrationFailedReason"
 	ProgressingReason                    = "ProgressingReason"
 )
 
@@ -48,48 +45,6 @@ type DatabaseSpec struct {
 	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
-
-	// Configure database migration
-	// +optional
-	Migration *Migration `json:"migration,omitempty"`
-}
-
-// Migration is used to migrate a database to another without data inconcistency
-type Migration struct {
-	// DatabaseName is by default the same as metata.name or if set spec.databaseName
-	// +optional
-	DatabaseName string `json:"databaseName"`
-
-	// The connect URI, by default the same as spec.address. Note at least the databaseName or address have to differ from spec.databaseName or spec.address.
-	// +optional
-	Address string `json:"address,omitempty"`
-
-	// Contains a credentials set of a user with enough permission to manage databases and user accounts
-	// +optional
-	RootSecret *SecretReference `json:"rootSecret"`
-
-	// Configure workloads which are scaled to 0 before the migration
-	// +optional
-	Workloads []WorkloadReference `json:"workloads,omitempty"`
-}
-
-// Workload reference
-type WorkloadReference struct {
-	// Kind of workload type, Deployment, StatefulSet, ReplicaSet
-	// +required
-	Kind string `json:"kind"`
-
-	// Name of workload
-	// +required
-	Name string `json:"name"`
-
-	// Namespace, by default use the same samespace
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// Scale to the the number of replicas after successful migration. If left empty it will automatically be aligned with the replicas configured on the reffered workload
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 // DatabaseReference is a named reference to a database kind

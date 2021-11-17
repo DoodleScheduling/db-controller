@@ -85,58 +85,6 @@ func (in *PostgreSQLDatabase) GetDatabaseName() string {
 	return in.GetName()
 }
 
-func (in *PostgreSQLDatabase) MigrationRequired() bool {
-	if in.Spec.Migration == nil {
-		return false
-	}
-
-	return true
-}
-
-func (in *PostgreSQLDatabase) GetMigrationAddress() string {
-	if in.Spec.Migration == nil {
-		return ""
-	}
-
-	if in.Spec.Migration.Address == "" {
-		return in.Spec.Address
-	}
-
-	return in.Spec.Migration.Address
-}
-
-func (in *PostgreSQLDatabase) GetMigrationRootSecret() *SecretReference {
-	if in.Spec.Migration == nil {
-		return nil
-	}
-
-	if in.Spec.Migration.RootSecret == nil {
-		return in.GetRootSecret()
-	}
-
-	return in.Spec.Migration.RootSecret
-}
-
-func (in *PostgreSQLDatabase) GetMigrationDatabaseName() string {
-	if in.Spec.Migration == nil {
-		return ""
-	}
-
-	if in.Spec.Migration.DatabaseName == "" {
-		return in.GetDatabaseName()
-	}
-
-	return in.Spec.Migration.DatabaseName
-}
-
-func (in *PostgreSQLDatabase) GetMigrationWorkloads() []WorkloadReference {
-	if in.Spec.Migration == nil {
-		return []WorkloadReference{}
-	}
-
-	return in.Spec.Migration.Workloads
-}
-
 func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
 	return ""
 }

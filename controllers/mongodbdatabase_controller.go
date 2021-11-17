@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/doodlescheduling/k8sdb-controller/common/database"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
@@ -159,71 +158,7 @@ func (r *MongoDBDatabaseReconciler) reconcile(ctx context.Context, db infrav1bet
 }
 
 func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
-	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
-
-	if err != nil {
-		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return db, err
-	}
-
-	if db.MigrationRequired() {
-		dbHandler, err := setupMongoDB(ctx, db, usr, pw)
-
-		if err != nil {
-			infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
-			return db, err
-		}
-
-		defer dbHandler.Close(ctx)
-
-		//If the db already exists skip migration
-		if exists, err := dbHandler.DatabaseExists(ctx, db.GetDatabaseName()); err != nil || exists == true {
-			return db, nil
-		}
-
-		srcUsername := usr
-		srcPassword := pw
-
-		if db.GetMigrationRootSecret() != nil {
-			srcUsername, srcPassword, err = getSecret(ctx, r.Client, db.GetMigrationRootSecret())
-
-			if err != nil {
-				infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
-				return db, err
-			}
-		}
-
-		srcOpts := database.MongoDBOptions{
-			URI:          db.GetMigrationAddress(),
-			DatabaseName: db.GetMigrationDatabaseName(),
-			Username:     srcUsername,
-			Password:     srcPassword,
-		}
-
-		workloads, err := downscaleWorkloads(ctx, r.Client, db.GetMigrationWorkloads())
-		db.Spec.Migration.Workloads = workloads
-
-		if err != nil {
-			err = fmt.Errorf("Failed to scale down referenced workloads: %w", err)
-			infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
-			return db, err
-		}
-
-		err = dbHandler.RestoreDatabaseFrom(ctx, srcOpts)
-
-		if err != nil {
-			err = fmt.Errorf("Failed to migrate database: %w", err)
-			infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.MigrationFailedReason, err.Error())
-			return db, err
-		}
-
-		err = upscaleWorkloads(ctx, r.Client, db.GetMigrationWorkloads())
-		if err != nil {
-			err = fmt.Errorf("Failed to scale up referenced workloads: %w", err)
-			infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
-			return db, err
-		}
-	}
+	//nothin to do for mongodb
 
 	return db, nil
 }
