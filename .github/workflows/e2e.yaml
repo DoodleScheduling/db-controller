@@ -55,7 +55,7 @@ jobs:
           kubectl create ns mongodb
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm upgrade --wait -i mongodb bitnami/mongodb \
-          --version $MONGOBD_VER \
+          --version $MONGODB_VER \
           --namespace mongodb \
           --set auth.rootPassword=password \
           --set persistence.enabled=false
