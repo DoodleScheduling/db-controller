@@ -59,7 +59,7 @@ jobs:
           --namespace mongodb \
           --set auth.rootPassword=password \
           --set persistence.enabled=false
-          kubectl -n k8sdb-system apply -f ./config/testdata/mongodb/secret.yaml
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodb/root-secret.yaml
           curl https://github.com//mongodb/mongocli/releases/download/v1.20.4/mongocli_1.20.4_linux_x86_64.deb -o mongocli_1.20.4_linux_x86_64.deb
           dpkg -i mongocli_1.20.4_linux_x86_64.deb
           kubectl -n mongodb port-forward svc/mongodb 27017 &
