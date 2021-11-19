@@ -68,7 +68,7 @@ jobs:
         run: |
           kubectl -n k8sdb-system apply -f ./config/testdata/mongodbdatabase
           kubectl -n k8sdb-system apply -f ./config/testdata/mongodbuser
-          kubectl -n k8sdb-system wait mongodbdatabase/foo --for=condition=ready --timeout=1m
+          kubectl -n k8sdb-system wait mongodbdatabase/admin --for=condition=ready --timeout=1m
           kubectl -n k8sdb-system wait mongodbuser/foo --for=condition=ready --timeout=1m
           mongo mongodb://localhost:27017/foo --authDatabase=admin -u foo -p password --eval 'db.bar.insertInto({"foo":"bar"})'
       - name: Logs
