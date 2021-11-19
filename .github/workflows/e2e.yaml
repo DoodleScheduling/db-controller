@@ -42,12 +42,12 @@ jobs:
             echo 'run make test and commit changes'
             exit 1
           fi
-      - name: Build container image
-        run: make docker-build IMG=test/k8sdb-controller TAG=latest BUILD_PLATFORMS=linux/amd64 BUILD_ARGS=--load
+      - name: Build container image1
+        run: make docker-build IMG=test/k8sdb-controller:latest BUILD_PLATFORMS=linux/amd64 BUILD_ARGS=--load
       - name: Load test image
         run: kind load docker-image test/k8sdb-controller:latest
       - name: Deploy controller
-        run: make dev-deploy IMG=test/k8sdb-controller TAG=latest
+        run: make deploy IMG=test/k8sdb-controller:latest
       - name: Setup MongoDB
         env:
           MONGODB_VER: ${{ '10.29.2' }}
@@ -59,29 +59,30 @@ jobs:
           --namespace mongodb \
           --set auth.rootPassword=password \
           --set persistence.enabled=false
-          kubectl -n ctrl-system apply -f ./config/testdata/mongodb/secret.yaml
-          dpkg -i https://github.com//mongodb/mongocli/releases/download/v1.20.4/mongocli_1.20.4_linux_x86_64.deb
-          kubectl port-forward svc/mongodb 27017 &
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodb/secret.yaml
+          curl https://github.com//mongodb/mongocli/releases/download/v1.20.4/mongocli_1.20.4_linux_x86_64.deb -o mongocli_1.20.4_linux_x86_64.deb
+          dpkg -i mongocli_1.20.4_linux_x86_64.deb
+          kubectl -n mongodb port-forward svc/mongodb 27017 &
           sleep 2
       - name: Run MongoDB tests
         run: |
-          kubectl -n ctrl-system apply -f ./config/testdata/mongodbdatabase
-          kubectl -n ctrl-system apply -f ./config/testdata/mongodbuser
-          kubectl -n ctrl-system wait mongodbdatabase/foo --for=condition=ready --timeout=1m
-          kubectl -n ctrl-system wait mongodbuser/foo --for=condition=ready --timeout=1m
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodbdatabase
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodbuser
+          kubectl -n k8sdb-system wait mongodbdatabase/foo --for=condition=ready --timeout=1m
+          kubectl -n k8sdb-system wait mongodbuser/foo --for=condition=ready --timeout=1m
           mongo mongodb://localhost:27017/foo --authDatabase=admin -u foo -p password --eval 'db.bar.insertInto({"foo":"bar"})'
       - name: Logs
         run: |
-          kubectl -n ctrl-system logs deploy/k8sdb-controller
+          kubectl -n k8sdb-system logs deploy/k8sdb-controller
       - name: Debug failure
         if: failure()
         run: |
           kubectl -n kube-system describe pods
-          kubectl -n ctrl-system describe pods
-          kubectl -n ctrl-system get mongodbdatabase -oyaml
-          kubectl -n ctrl-system get mongodbuser -oyaml
-          kubectl -n ctrl-system get postgresqldatabase -oyaml
-          kubectl -n ctrl-system get postgresqluser -oyaml
-          kubectl -n ctrl-system get all
-          kubectl -n ctrl-system logs deploy/k8sdb-controller
+          kubectl -n k8sdb-system describe pods
+          kubectl -n k8sdb-system get mongodbdatabase -oyaml
+          kubectl -n k8sdb-system get mongodbuser -oyaml
+          kubectl -n k8sdb-system get postgresqldatabase -oyaml
+          kubectl -n k8sdb-system get postgresqluser -oyaml
+          kubectl -n k8sdb-system get all
+          kubectl -n k8sdb-system logs deploy/k8sdb-controller
           kubectl -n minio get all
