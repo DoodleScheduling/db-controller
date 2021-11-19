@@ -36,6 +36,11 @@ import (
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbdatabases/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+
 // MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
 type MongoDBDatabaseReconciler struct {
 	client.Client
@@ -89,10 +94,6 @@ func (r *MongoDBDatabaseReconciler) requestsForSecretChange(o client.Object) []r
 
 	return reqs
 }
-
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("mongodbdatabase", req.NamespacedName)

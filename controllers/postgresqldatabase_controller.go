@@ -36,6 +36,11 @@ import (
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqldatabases/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
 type PostgreSQLDatabaseReconciler struct {
 	client.Client
@@ -89,10 +94,6 @@ func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) 
 
 	return reqs
 }
-
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("PostgreSQLDatabase", req.NamespacedName)

@@ -60,17 +60,36 @@ jobs:
           --set auth.rootPassword=password \
           --set persistence.enabled=false
           kubectl -n k8sdb-system apply -f ./config/testdata/mongodb/root-secret.yaml
-          curl https://github.com//mongodb/mongocli/releases/download/v1.20.4/mongocli_1.20.4_linux_x86_64.deb -o mongocli_1.20.4_linux_x86_64.deb
-          dpkg -i mongocli_1.20.4_linux_x86_64.deb
-          kubectl -n mongodb port-forward svc/mongodb 27017 &
-          sleep 2
       - name: Run MongoDB tests
         run: |
           kubectl -n k8sdb-system apply -f ./config/testdata/mongodbdatabase
           kubectl -n k8sdb-system apply -f ./config/testdata/mongodbuser
-          kubectl -n k8sdb-system wait mongodbdatabase/admin --for=condition=ready --timeout=1m
-          kubectl -n k8sdb-system wait mongodbuser/foo --for=condition=ready --timeout=1m
-          mongo mongodb://localhost:27017/foo --authDatabase=admin -u foo -p password --eval 'db.bar.insertInto({"foo":"bar"})'
+          kubectl -n k8sdb-system wait mongodbdatabase/admin --for=condition=DatabaseReady --timeout=1m
+          kubectl -n k8sdb-system wait mongodbuser/foo --for=condition=UserReady --timeout=1m
+          kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
+          kubectl -n k8sdb-system delete -f ./config/testdata/mongodbuser
+          ! kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
+      - name: Setup PostgreSQL
+        env:
+          POSTGRESQL_VER: ${{ '10.13.8' }}
+        run: |
+          kubectl create ns postgresql
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm upgrade --wait -i postgresql bitnami/postgresql \
+          --version $POSTGRESQL_VER \
+          --namespace postgresql \
+          --set postgresqlPassword=password \
+          --set persistence.enabled=false
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresql/root-secret.yaml
+      - name: Run PostgreSQL tests
+        run: |
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresqldatabase
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresqluser
+          kubectl -n k8sdb-system wait postgresqldatabase/foo --for=condition=DatabaseReady --timeout=1m
+          kubectl -n k8sdb-system wait postgresqluser/foo --for=condition=UserReady --timeout=1m
+          PGPASSWORD=password kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- psql -h localhost -U foo foo -c '\d'
+          kubectl -n k8sdb-system delete -f ./config/testdata/mongodbuser
+          ! kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
       - name: Logs
         run: |
           kubectl -n k8sdb-system logs deploy/k8sdb-controller

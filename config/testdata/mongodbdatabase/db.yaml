@@ -3,7 +3,7 @@ kind: MongoDBDatabase
 metadata:
   name: admin
 spec:
-  address: mongodb://mongodb-headless.mongodb:27017
+  address: mongodb://mongodb.mongodb:27017
   databaseName: admin
   rootSecret:
     name: mongodb-root

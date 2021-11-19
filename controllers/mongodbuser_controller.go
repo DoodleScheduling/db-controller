@@ -37,6 +37,11 @@ import (
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 )
 
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbusers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbusers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+
 // MongoDBUserReconciler reconciles a MongoDBUser object
 type MongoDBUserReconciler struct {
 	client.Client
@@ -129,10 +134,6 @@ func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []rec
 
 	return reqs
 }
-
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=MongoDBUsers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=MongoDBUsers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("MongoDBUser", req.NamespacedName)
@@ -248,7 +249,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
 	if err != nil {
-		err = fmt.Errorf("Failed to provison user account: %w", err)
+		err = fmt.Errorf("Failed to provision user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
