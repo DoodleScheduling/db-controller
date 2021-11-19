@@ -1,0 +1,11 @@
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: MongoDBDatabase
+metadata:
+  name: mongodb-admin
+spec:
+  address: mongodb://mongodb-headless.mongodb:27017
+  databaseName: admin
+  rootSecret:
+    name: mongodb-root
+    passwordField: password
+    userField: username
