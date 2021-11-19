@@ -33,10 +33,8 @@ jobs:
           version: "1.19.2"
       - name: Setup Helm
         uses: fluxcd/pkg/actions/helm@main
-      - name: Run tests
-        uses: ./.github/actions/run-tests
-        env:
-          GOPATH: /github/home/go
+      - name: Run controller tests
+        run: make test
       - name: Check if working tree is dirty
         run: |
           if [[ $(git diff --stat) != '' ]]; then
