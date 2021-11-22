@@ -169,6 +169,9 @@ spec:
                   - type
                   type: object
                 type: array
+              username:
+                description: Username of the created user.
+                type: string
             type: object
         type: object
     served: true

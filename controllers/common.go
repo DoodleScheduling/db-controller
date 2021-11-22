@@ -21,6 +21,10 @@ const (
 	dbIndexKey          string = ".metadata.database"
 )
 
+type userDropper interface {
+	DropUser(ctx context.Context, db, username string) error
+}
+
 // objectKey returns c.ObjectKey for the object.
 func objectKey(object metav1.Object) client.ObjectKey {
 	return client.ObjectKey{

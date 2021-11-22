@@ -30,11 +30,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 )
 
 // +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqlusers,verbs=get;list;watch;create;update;patch;delete
@@ -154,26 +157,17 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// set finalizer
-	if err := user.SetFinalizer(func() error {
-		return r.Update(ctx, &user)
-	}); err != nil {
-		return reconcile.Result{}, err
+	// examine DeletionTimestamp to determine if object is under deletion
+	if user.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !stringutils.ContainsString(user.GetFinalizers(), v1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&user, v1beta1.Finalizer)
+			if err := r.Update(ctx, &user); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
-	// finalize
-	if finalized, err := user.Finalize(func() error {
-		return r.Update(ctx, &user)
-	}, func() error {
-		_, err := r.reconcile(ctx, user, true)
-		return err
-	}); err != nil {
-		return reconcile.Result{}, err
-	} else if finalized {
-		return reconcile.Result{}, nil
-	}
-
-	user, err := r.reconcile(ctx, user, false)
+	user, err := r.reconcile(ctx, user)
 	res := ctrl.Result{}
 
 	if err != nil {
@@ -194,7 +188,7 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return res, nil
 }
 
-func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser, finalize bool) (infrav1beta1.PostgreSQLUser, error) {
+func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser) (infrav1beta1.PostgreSQLUser, error) {
 	// Fetch referencing database
 	var db infrav1beta1.PostgreSQLDatabase
 	databaseName := types.NamespacedName{
@@ -226,6 +220,10 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	defer dbHandler.Close(ctx)
 
+	if !user.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.finalizeUser(ctx, user, db, dbHandler)
+	}
+
 	// Fetch referencing secret
 	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
 
@@ -234,22 +232,31 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	if finalize == true {
-		err = dbHandler.DropUser(ctx, db.GetDatabaseName(), usr)
-		if err != nil {
-			err = fmt.Errorf("Failed to remove user account: %w", err)
-			infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
-			return user, err
-		}
-
-		return user, nil
-	}
-
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw)
 	if err != nil {
 		err = fmt.Errorf("Failed to provison user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
+	}
+
+	user.Status.Username = usr
+
+	return user, nil
+}
+
+func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, userDropper userDropper) (infrav1beta1.PostgreSQLUser, error) {
+	err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
+	if err != nil {
+		err = fmt.Errorf("Failed to remove user account: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	if stringutils.ContainsString(user.ObjectMeta.Finalizers, v1beta1.Finalizer) {
+		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, v1beta1.Finalizer)
+		if err := r.Update(ctx, &user); err != nil {
+			return user, err
+		}
 	}
 
 	return user, nil
