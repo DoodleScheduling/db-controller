@@ -5,6 +5,3 @@ bases:
 - ../rbac
 - ../manager
 - namespace.yaml
-
-patchesStrategicMerge:
-- manager_auth_proxy_patch.yaml
