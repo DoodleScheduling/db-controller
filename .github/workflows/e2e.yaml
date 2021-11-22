@@ -87,9 +87,9 @@ jobs:
           kubectl -n k8sdb-system apply -f ./config/testdata/postgresqluser
           kubectl -n k8sdb-system wait postgresqldatabase/foo --for=condition=DatabaseReady --timeout=1m
           kubectl -n k8sdb-system wait postgresqluser/foo --for=condition=UserReady --timeout=1m
-          PGPASSWORD=password kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- psql -h localhost -U foo foo -c '\d'
-          kubectl -n k8sdb-system delete -f ./config/testdata/mongodbuser
-          ! kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
+          kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- bash -c "PGPASSWORD=password psql -h localhost -U foo foo -c '\l'"
+          kubectl -n k8sdb-system delete -f ./config/testdata/postgresqluser
+          ! kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- bash -c "PGPASSWORD=password psql -h localhost -U foo foo -c '\l'"
       - name: Logs
         run: |
           kubectl -n k8sdb-system logs deploy/k8sdb-controller
