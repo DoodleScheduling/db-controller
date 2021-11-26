@@ -50,6 +50,9 @@ func setupMongoDBContainer(ctx context.Context) (*mongodbContainer, error) {
 			"MONGO_INITDB_ROOT_USERNAME": "root",
 			"MONGO_INITDB_ROOT_PASSWORD": "password",
 		},
+		Tmpfs: map[string]string{
+			"/data/db": "",
+		},
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
