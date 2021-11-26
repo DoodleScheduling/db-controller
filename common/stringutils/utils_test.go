@@ -27,7 +27,7 @@ func TestRemoveString(t *testing.T) {
 	})
 
 	t.Run("don't reslice if string not found", func(t *testing.T) {
-		res := RemoveString([]string{"foo", "bar"}, "bar")
+		res := RemoveString([]string{"foo", "bar"}, "fooo")
 		g.Expect(res).To(Equal([]string{"foo", "bar"}))
 	})
 }
