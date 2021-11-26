@@ -34,6 +34,7 @@ type MongoDBUserSpec struct {
 	// +required
 	Credentials *SecretReference `json:"credentials"`
 
+	// +optional
 	// +kubebuilder:default:={{name: readWrite}}
 	Roles *[]MongoDBUserRole `json:"roles"`
 }
