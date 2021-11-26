@@ -5,7 +5,7 @@ podTemplate(label: 'k8sdb-controller',
   containers: [
     containerTemplate(
       name: 'golang',
-      image: 'bitnami/golang:1.15',
+      image: 'bitnami/golang:1.16',
       ttyEnabled: true
     ),
     containerTemplate(

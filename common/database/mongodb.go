@@ -45,7 +45,8 @@ type MongoDBRepository struct {
 
 func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRepository, error) {
 	o := options.Client()
-	o.SetConnectTimeout(time.Duration(2) * time.Second)
+	o.SetConnectTimeout(time.Duration(3) * time.Second)
+	o.SetServerSelectionTimeout(time.Duration(3) * time.Second)
 	o.ApplyURI(opts.URI)
 
 	o.SetAuth(options.Credential{
@@ -66,21 +67,6 @@ func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRep
 		client: client,
 		opts:   opts,
 	}, nil
-}
-
-func (m *MongoDBRepository) DatabaseExists(ctx context.Context, name string) (bool, error) {
-	dbs, err := m.client.ListDatabaseNames(ctx, bson.M{})
-	if err != nil {
-		return false, err
-	}
-
-	for _, v := range dbs {
-		if v == name {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func (m *MongoDBRepository) Close(ctx context.Context) error {
