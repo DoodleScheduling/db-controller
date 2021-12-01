@@ -2,12 +2,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: mongodbdatabase-editor-role
+  name: mongodbuser-editor-role
 rules:
 - apiGroups:
   - dbprovisioning.infra.doodle.com
   resources:
-  - mongodbdatabases
+  - mongodbusers
   verbs:
   - create
   - delete
@@ -19,6 +19,6 @@ rules:
 - apiGroups:
   - dbprovisioning.infra.doodle.com
   resources:
-  - mongodbdatabases/status
+  - mongodbusers/status
   verbs:
   - get

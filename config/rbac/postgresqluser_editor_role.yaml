@@ -1,13 +1,13 @@
-# permissions for end users to edit mongodbs.
+# permissions for end users to edit postgresqls.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: mongodbdatabase-editor-role
+  name: postgresqluser-editor-role
 rules:
 - apiGroups:
   - dbprovisioning.infra.doodle.com
   resources:
-  - mongodbdatabases
+  - postgresqlusers
   verbs:
   - create
   - delete
@@ -19,6 +19,6 @@ rules:
 - apiGroups:
   - dbprovisioning.infra.doodle.com
   resources:
-  - mongodbdatabases/status
+  - postgresqlusers/status
   verbs:
   - get
