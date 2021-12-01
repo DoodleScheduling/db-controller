@@ -108,4 +108,5 @@ jobs:
           kubectl -n k8sdb-system get postgresqluser -oyaml
           kubectl -n k8sdb-system get all
           kubectl -n k8sdb-system logs deploy/k8sdb-controller
-          kubectl -n minio get all
+          kubectl -n mongodb get all
+          kubectl -n postgresql get all
