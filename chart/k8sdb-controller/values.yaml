@@ -8,8 +8,8 @@ fullnameOverride: ""
 
 image:
   pullPolicy: IfNotPresent
-  repository: nexus.doodle.com:5000/devops/k8sdb-controller
-  tag: 0.0.0
+  repository: ghcr.io/doodlescheduling/k8sdb-controller
+  tag:
 
 imagePullSecrets: []
 
