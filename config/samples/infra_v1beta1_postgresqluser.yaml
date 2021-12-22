@@ -1,19 +1,19 @@
 apiVersion: dbprovisioning.infra.doodle.com/v1beta1
-kind: MongoDBDatabase
+kind: PostgreSQLUser
 metadata:
   name: my-app
   namespace: default
 spec:
-  address: "mongodb://localhost:27017"
-  rootSecret:
-    name: mongodb
-    passwordField: "mongodb-root-password"
+  database:
+    name: my-app
+  credentials:
+    name: my-app-postgresql
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mongodb
+  name: my-app-postgresql
   namespace: default
 data:
-  mongodb-root-password: MTIzNA==
+  password: MTIzNA==
   username: MTIzNA==

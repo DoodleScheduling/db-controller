@@ -9,24 +9,13 @@ spec:
     name: postgresql
     passwordField: "postgresql-password"
   extensions:
-    - name: pg_trgm
----
-apiVersion: dbprovisioning.infra.doodle.com/v1beta1
-kind: PostgreSQLUser
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  database:
-    name: my-app
-  credentials:
-    name: my-app-postgresql
+  - name: pg_trgm
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: my-app-postgresql
+  name: postgresql
   namespace: default
 data:
-  password: MTIzNA==
+  postgresql-password: MTIzNA==
   username: MTIzNA==

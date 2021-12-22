@@ -59,8 +59,8 @@ const (
 
 // config variables & defaults
 var (
-	metricsAddr             = ":8080"
-	probesAddr              = ":9558"
+  metricsAddr             = ":9556"
+  probesAddr              = ":9557"
 	profilerAddr            = ":6060"
 	enableLeaderElection    = false
 	leaderElectionNamespace = ""
@@ -76,15 +76,15 @@ func init() {
 }
 
 func main() {
-	flag.StringVar(&metricsAddr, MetricAddr, ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probesAddr, ProbeAddr, ":9558", "The address of the probe endpoints bind to.")
-	flag.StringVar(&profilerAddr, ProfilerAddr, ":6060", "The address of the profiler endpoints bind to.")
-	flag.BoolVar(&enableLeaderElection, EnableLeaderElection, false,
+	flag.StringVar(&metricsAddr, MetricAddr, metricsAddr, "The address the metric endpoint binds to.")
+	flag.StringVar(&probesAddr, ProbeAddr, probesAddr, "The address of the probe endpoints bind to.")
+	flag.StringVar(&profilerAddr, ProfilerAddr, profilerAddr, "The address of the profiler endpoints bind to.")
+	flag.BoolVar(&enableLeaderElection, EnableLeaderElection, enableLeaderElection,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaderElectionNamespace, LeaderElectionNamespace, "", "Leader election namespace. Default is the same namespace as controller.")
-	flag.StringVar(&namespacesConfig, Namespaces, "", "Comma-separated list of namespaces to watch. If not set, all namespaces will be watched.")
-	flag.IntVar(&maxConcurrentReconciles, MaxConcurrentReconciles, 1, "Maximum number of concurrent reconciles. Default is 1.")
+	flag.StringVar(&leaderElectionNamespace, LeaderElectionNamespace, leaderElectionNamespace, "Leader election namespace. Default is the same namespace as controller.")
+	flag.StringVar(&namespacesConfig, Namespaces, namespacesConfig, "Comma-separated list of namespaces to watch. If not set, all namespaces will be watched.")
+	flag.IntVar(&maxConcurrentReconciles, MaxConcurrentReconciles, maxConcurrentReconciles, "Maximum number of concurrent reconciles. Default is 1.")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
