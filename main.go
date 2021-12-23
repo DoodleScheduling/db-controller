@@ -59,8 +59,8 @@ const (
 
 // config variables & defaults
 var (
-  metricsAddr             = ":9556"
-  probesAddr              = ":9557"
+	metricsAddr             = ":9556"
+	probesAddr              = ":9557"
 	profilerAddr            = ":6060"
 	enableLeaderElection    = false
 	leaderElectionNamespace = ""
