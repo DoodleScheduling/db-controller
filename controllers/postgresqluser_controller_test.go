@@ -235,7 +235,7 @@ var _ = Describe("PostgreSQLUserReconciler", func() {
 			}
 			Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
 
-			By("Adding mogodbuser")
+			By("Adding postgresqldbuser")
 			keyUser := types.NamespacedName{
 				Name:      "postgresqluser-" + randStringRunes(5),
 				Namespace: namespace.Name,
@@ -290,7 +290,7 @@ var _ = Describe("PostgreSQLUserReconciler", func() {
 			}
 			Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
 
-			By("Adding mogodbuser")
+			By("Adding postgresqldbuser")
 			keyUser := types.NamespacedName{
 				Name:      "postgresqluser-" + randStringRunes(5),
 				Namespace: namespace.Name,
@@ -345,7 +345,7 @@ var _ = Describe("PostgreSQLUserReconciler", func() {
 			}
 			Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
 
-			By("Adding mogodbuser")
+			By("Adding postgresqldbuser")
 			keySecret := types.NamespacedName{
 				Name:      "secret-" + randStringRunes(5),
 				Namespace: namespace.Name,
@@ -406,7 +406,7 @@ var _ = Describe("PostgreSQLUserReconciler", func() {
 			}
 			Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
 
-			By("Adding mogodbuser")
+			By("Adding postgresqldbuser")
 			keySecret := types.NamespacedName{
 				Name:      "secret-" + randStringRunes(5),
 				Namespace: namespace.Name,
