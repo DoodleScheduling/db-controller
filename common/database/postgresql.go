@@ -78,7 +78,7 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(ctx context.Context, da
 		if databaseExists {
 			return nil
 		}
-		if _, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE \"%s\";", database)); err != nil {
+		if _, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s;", (pgx.Identifier{database}).Sanitize())); err != nil {
 			return err
 		} else {
 			if databaseExistsNow, err := s.doesDatabaseExist(ctx, database); err != nil {
@@ -133,7 +133,7 @@ func (s *PostgreSQLRepository) createUserIfNotExists(ctx context.Context, user s
 		if userExists {
 			return nil
 		}
-		if _, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE USER \"%s\";", user)); err != nil {
+		if _, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE USER %s;", (pgx.Identifier{user}).Sanitize())); err != nil {
 			return err
 		} else {
 			if userExistsNow, err := s.doesUserExist(ctx, user); err != nil {
@@ -183,23 +183,28 @@ func (s *PostgreSQLRepository) setPasswordForUser(ctx context.Context, user stri
 		return err
 	}
 
-	_, err = s.conn.Exec(ctx, fmt.Sprintf("ALTER USER \"%s\" WITH ENCRYPTED PASSWORD \"%s\";", (pgx.Identifier{user}).Sanitize(), password))
+	_, err = s.conn.Exec(ctx, fmt.Sprintf("ALTER USER %s WITH ENCRYPTED PASSWORD '%s';", (pgx.Identifier{user}).Sanitize(), password))
 	return err
 }
 
 func (s *PostgreSQLRepository) grantAllPrivileges(ctx context.Context, database string, user string) error {
-	_, err := s.conn.Exec(ctx, fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\";", database, user))
+	_, err := s.conn.Exec(ctx, fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", (pgx.Identifier{database}).Sanitize(), (pgx.Identifier{user}).Sanitize()))
 	return err
 }
 
 func (s *PostgreSQLRepository) RevokeAllPrivileges(ctx context.Context, database string, user string) error {
-	_, err := s.conn.Exec(ctx, fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\";", database, user))
+	_, err := s.conn.Exec(ctx, fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE %s FROM %s;", (pgx.Identifier{database}).Sanitize(), (pgx.Identifier{user}).Sanitize()))
 	return err
 }
 
 func (s *PostgreSQLRepository) doesDatabaseExist(ctx context.Context, database string) (bool, error) {
+	database, err := s.conn.PgConn().EscapeString(database)
+	if err != nil {
+		return false, err
+	}
+
 	var result int64
-	err := s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s';", database)).Scan(&result)
+	err = s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s';", database)).Scan(&result)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil
@@ -210,8 +215,13 @@ func (s *PostgreSQLRepository) doesDatabaseExist(ctx context.Context, database s
 }
 
 func (s *PostgreSQLRepository) doesUserExist(ctx context.Context, user string) (bool, error) {
+	user, err := s.conn.PgConn().EscapeString(user)
+	if err != nil {
+		return false, err
+	}
+
 	var result int64
-	err := s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s';", user)).Scan(&result)
+	err = s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s';", user)).Scan(&result)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil
@@ -222,8 +232,13 @@ func (s *PostgreSQLRepository) doesUserExist(ctx context.Context, user string) (
 }
 
 func (s *PostgreSQLRepository) doesExtensionExist(ctx context.Context, db, name string) (bool, error) {
+	name, err := s.conn.PgConn().EscapeString(name)
+	if err != nil {
+		return false, err
+	}
+
 	var result int64
-	err := s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 from pg_extension where extname='%s';", name)).Scan(&result)
+	err = s.conn.QueryRow(ctx, fmt.Sprintf("SELECT 1 from pg_extension where extname='%s';", name)).Scan(&result)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil
