@@ -163,6 +163,7 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	user, err := r.reconcile(ctx, user)
 	res := ctrl.Result{}
+	user.Status.ObservedGeneration = user.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&user, "Normal", "error", err.Error())

@@ -21,15 +21,19 @@ import (
 	"math/rand"
 	"path/filepath"
 	"testing"
+	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -50,12 +54,10 @@ var cancel context.CancelFunc
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	logf.SetLogger(
 		zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)),
 	)
@@ -124,9 +126,7 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
-
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	cancel()
@@ -143,4 +143,45 @@ func randStringRunes(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+func setupNamespace() (*v1.Namespace, *v1.Secret) {
+	const (
+		timeout  = time.Second * 10
+		interval = time.Second * 1
+	)
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "ns-" + randStringRunes(5)},
+	}
+
+	keyRootSecret := types.NamespacedName{
+		Name:      "secret-" + randStringRunes(5),
+		Namespace: namespace.Name,
+	}
+	createdSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      keyRootSecret.Name,
+			Namespace: keyRootSecret.Namespace,
+		},
+		Data: map[string][]byte{
+			"username": []byte("root"),
+			"password": []byte("password"),
+		},
+	}
+
+	BeforeAll(func() {
+		err := k8sClient.Create(context.Background(), namespace)
+		Expect(err).NotTo(HaveOccurred(), "failed to create test namespace")
+
+		Expect(k8sClient.Create(context.Background(), createdSecret)).Should(Succeed())
+	})
+
+	AfterAll(func() {
+		Eventually(func() error {
+			return k8sClient.Delete(context.Background(), namespace)
+		}, timeout, interval).Should(Succeed(), "failed to delete test namespace")
+	})
+
+	return namespace, createdSecret
 }

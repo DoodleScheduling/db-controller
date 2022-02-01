@@ -37,6 +37,9 @@ type MongoDBDatabaseStatus struct {
 	// Conditions holds the conditions for the MongoDBDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient

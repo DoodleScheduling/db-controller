@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -37,6 +39,7 @@ import (
 
 	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/database"
 	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 )
 
@@ -169,6 +172,7 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	user, err := r.reconcile(ctx, user)
 	res := ctrl.Result{}
+	user.Status.ObservedGeneration = user.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&user, "Normal", "error", err.Error())
@@ -244,10 +248,34 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	return user, nil
 }
 
-func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, userDropper userDropper) (infrav1beta1.PostgreSQLUser, error) {
-	err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
+func generateToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
+}
+
+func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, dbHandler *database.PostgreSQLRepository) (infrav1beta1.PostgreSQLUser, error) {
+	if user.Status.Username == "" {
+		return user, nil
+	}
+
+	//We can't easily drop a user from postgres since it ownes objects
+	//err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
+
+	//Instead privileges are revoked and the password gets randomized
+	err := dbHandler.SetupUser(ctx, db.GetDatabaseName(), user.Status.Username, generateToken(32))
 	if err != nil {
-		err = fmt.Errorf("Failed to remove user account: %w", err)
+		err = fmt.Errorf("Failed to update user account: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	err = dbHandler.RevokeAllPrivileges(ctx, db.GetDatabaseName(), user.Status.Username)
+
+	if err != nil {
+		err = fmt.Errorf("Failed to revoke privileges from user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}

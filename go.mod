@@ -8,8 +8,8 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/jackc/pgx/v4 v4.10.1
 	github.com/mongodb-forks/digest v1.0.2
-	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.15.0
+	github.com/onsi/ginkgo/v2 v2.0.0
+	github.com/onsi/gomega v1.17.0
 	github.com/prometheus/common v0.26.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0

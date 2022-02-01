@@ -48,6 +48,9 @@ type PostgreSQLDatabaseStatus struct {
 	// Conditions holds the conditions for the PostgreSQLDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient

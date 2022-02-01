@@ -54,6 +54,9 @@ type MongoDBUserStatus struct {
 	// Username of the created user.
 	// +optional
 	Username string `json:"username,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient

@@ -142,7 +142,7 @@ func getSecret(ctx context.Context, c client.Client, sec *infrav1beta1.SecretRef
 
 	usr, pw, err := extractCredentials(sec, secret)
 	if err != nil {
-		return usr, pw, fmt.Errorf("Credentials field not found in referenced rootSecret: %w", err)
+		return usr, pw, fmt.Errorf("Credentials field not found in referenced secret: %w", err)
 	}
 
 	return usr, pw, err

@@ -126,6 +126,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	db, err := r.reconcile(ctx, db)
 	res := ctrl.Result{}
+	db.Status.ObservedGeneration = db.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&db, "Normal", "error", err.Error())

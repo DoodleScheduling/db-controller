@@ -126,6 +126,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	db, err := r.reconcile(ctx, db)
 	res := ctrl.Result{}
+	db.Status.ObservedGeneration = db.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&db, "Normal", "error", err.Error())
