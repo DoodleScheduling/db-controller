@@ -150,7 +150,7 @@ func (s *PostgreSQLRepository) createUserIfNotExists(ctx context.Context, user s
 }
 
 func (s *PostgreSQLRepository) createExtension(ctx context.Context, db, name string) error {
-	_, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE EXTENSION %s;", name))
+	_, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE EXTENSION %s;", (pgx.Identifier{name}).Sanitize()))
 	return err
 }
 
@@ -161,7 +161,7 @@ func (s *PostgreSQLRepository) dropUserIfNotExist(ctx context.Context, user stri
 		if !userExists {
 			return nil
 		}
-		if _, err := s.conn.Exec(ctx, fmt.Sprintf("DROP USER \"%s\";", user)); err != nil {
+		if _, err := s.conn.Exec(ctx, fmt.Sprintf("DROP USER %s;", (pgx.Identifier{user}).Sanitize())); err != nil {
 			return err
 		} else {
 			if userExistsNow, err := s.doesUserExist(ctx, user); err != nil {
