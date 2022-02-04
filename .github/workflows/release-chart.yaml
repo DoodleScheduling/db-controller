@@ -3,7 +3,7 @@ name: Release Chart
 on:
   push:
     branches:
-      - main
+      - master
       - DK-2793
 
 jobs:
