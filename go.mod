@@ -10,7 +10,6 @@ require (
 	github.com/mongodb-forks/digest v1.0.2
 	github.com/onsi/ginkgo/v2 v2.0.0
 	github.com/onsi/gomega v1.17.0
-	github.com/prometheus/common v0.26.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
 	github.com/testcontainers/testcontainers-go v0.12.0
