@@ -86,11 +86,6 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 10000
 
-service:
-  labels: {}
-  annotations: {}
-  type: ClusterIP
-
 serviceAccount:
   create: true
   # If create is true and name is not set, then a name is generated using the
@@ -107,8 +102,8 @@ clusterRBAC:
 podSecurityPolicy:
   enabled: true
 
-# Prometheus operator ServiceMonitor
-serviceMonitor:
+# Prometheus operator PodMonitor
+podMonitor:
   enabled: true
   interval: 30s
   scrapeTimeout: 10s
