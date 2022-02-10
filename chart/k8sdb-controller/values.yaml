@@ -104,7 +104,7 @@ podSecurityPolicy:
 
 # Prometheus operator PodMonitor
 podMonitor:
- enabled: false
+  enabled: false
   interval: 30s
   scrapeTimeout: 10s
   namespace:
