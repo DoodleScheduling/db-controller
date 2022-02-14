@@ -60,7 +60,11 @@ generate: controller-gen
 
 # Build the docker image
 docker-build:
-	docker build . -t ${IMG}
+	docker buildx build \
+	--platform=$(BUILD_PLATFORMS) \
+	-t ${IMG} \
+	--load \
+	${BUILD_ARGS} .
 
 # Push the docker image
 docker-push:
