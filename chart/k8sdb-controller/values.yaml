@@ -8,8 +8,8 @@ fullnameOverride: ""
 
 image:
   pullPolicy: IfNotPresent
-  repository: nexus.doodle.com:5000/devops/k8sdb-controller
-  tag: 0.0.0
+  repository: ghcr.io/doodlescheduling/k8sdb-controller
+  tag:
 
 imagePullSecrets: []
 
@@ -30,7 +30,7 @@ secretMounts: []
 #    secretName: secret
 #    path: /secrets
 
-#Add additional containers (sidecars)
+# Add additional containers (sidecars)
 extraContainers:
 
 podAnnotations: {}
@@ -86,11 +86,6 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 10000
 
-service:
-  labels: {}
-  annotations: {}
-  type: ClusterIP
-
 serviceAccount:
   create: true
   # If create is true and name is not set, then a name is generated using the
@@ -105,11 +100,11 @@ clusterRBAC:
 # Creates a PodSecurityPolicy and the role/rolebinding
 # allowing the serviceaccount to use it
 podSecurityPolicy:
-  enabled: true
+  enabled: false
 
-# Prometheus operator ServiceMonitor
-serviceMonitor:
-  enabled: true
+# Prometheus operator PodMonitor
+podMonitor:
+  enabled: false
   interval: 30s
   scrapeTimeout: 10s
   namespace:

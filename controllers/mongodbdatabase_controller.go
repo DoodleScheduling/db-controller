@@ -20,10 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/db"
 	"github.com/go-logr/logr"
-	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,10 +28,20 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 )
+
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbdatabases/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // MongoDBDatabaseReconciler reconciles a MongoDBDatabase object
 type MongoDBDatabaseReconciler struct {
@@ -48,9 +55,9 @@ func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcur
 	// Index the MongoDBDatabase by the Secret references they point at
 	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &infrav1beta1.MongoDBDatabase{}, secretIndexKey,
 		func(o client.Object) []string {
-			vb := o.(*infrav1beta1.MongoDBDatabase)
+			db := o.(*infrav1beta1.MongoDBDatabase)
 			return []string{
-				fmt.Sprintf("%s/%s", vb.GetNamespace(), vb.Spec.RootSecret.Name),
+				fmt.Sprintf("%s/%s", db.GetNamespace(), db.Spec.RootSecret.Name),
 			}
 		},
 	); err != nil {
@@ -83,24 +90,20 @@ func (r *MongoDBDatabaseReconciler) requestsForSecretChange(o client.Object) []r
 
 	var reqs []reconcile.Request
 	for _, i := range list.Items {
-		r.Log.Info("referenced secret from a MongoDBDatabase changed detected, reconcile binding", "namespace", i.GetNamespace(), "name", i.GetName())
+		r.Log.Info("referenced secret from a MongoDBDatabase changed detected", "namespace", i.GetNamespace(), "name", i.GetName())
 		reqs = append(reqs, reconcile.Request{NamespacedName: objectKey(&i)})
 	}
 
 	return reqs
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=mongodbdatabases/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-
 func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("mongodbdatabase", req.NamespacedName)
 	logger.Info("reconciling MongoDBDatabase")
 
 	// get database resource by namespaced name
-	var database infrav1beta1.MongoDBDatabase
-	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
+	var db infrav1beta1.MongoDBDatabase
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if apierrors.IsNotFound(err) {
 			// resource no longer present. Consider dropping a database? What about data, it will be lost.. Probably acceptable for devboxes
 			return ctrl.Result{}, nil
@@ -108,36 +111,89 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	database.SetDefaults()
+	db.SetDefaults()
 
-	// set finalizer
-	if err := database.SetFinalizer(func() error {
-		return r.Update(ctx, &database)
-	}); err != nil {
-		return reconcile.Result{}, err
+	// examine DeletionTimestamp to determine if object is under deletion
+	if db.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !stringutils.ContainsString(db.GetFinalizers(), v1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&db, v1beta1.Finalizer)
+			if err := r.Update(ctx, &db); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
-	// finalize
-	if finalized, err := database.Finalize(func() error {
-		return r.Update(ctx, &database)
-	}, func() error {
-		return nil
-		//return gc.CleanFromSpec(&database)
-	}); err != nil {
-		return reconcile.Result{}, err
-	} else if finalized {
-		return reconcile.Result{}, nil
-	}
+	db, err := r.reconcile(ctx, db)
+	res := ctrl.Result{}
+	db.Status.ObservedGeneration = db.GetGeneration()
 
-	_, result := reconcileDatabase(r.Client, db.NewMongoDBRepository, &database, r.Recorder)
+	if err != nil {
+		r.Recorder.Event(&db, "Normal", "error", err.Error())
+		res = ctrl.Result{Requeue: true}
+	} else {
+		msg := "Database successfully provisioned"
+		r.Recorder.Event(&db, "Normal", "info", msg)
+		infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisioningSuccessfulReason, msg)
+	}
 
 	// Update status after reconciliation.
-	if err := r.patchStatus(ctx, &database); err != nil {
-		log.Error(err, "unable to update status after reconciliation")
+	if err := r.patchStatus(ctx, &db); err != nil {
+		logger.Error(err, "unable to update status after reconciliation")
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	return result, nil
+	return res, nil
+}
+
+func (r *MongoDBDatabaseReconciler) reconcile(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
+	if db.Spec.AtlasGroupId != "" {
+		return r.reconcileAtlasDatabase(ctx, db)
+	}
+
+	return r.reconcileGenericDatabase(ctx, db)
+}
+
+func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
+	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.finalizeDatabase(ctx, db)
+	}
+
+	return db, nil
+}
+
+func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
+	pubKey, privKey, err := getSecret(ctx, r.Client, db.GetRootSecret())
+
+	if err != nil {
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return db, err
+	}
+
+	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey)
+
+	if err != nil {
+		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
+		return db, err
+	}
+
+	defer dbHandler.Close(ctx)
+
+	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.finalizeDatabase(ctx, db)
+	}
+
+	return db, nil
+}
+
+func (r *MongoDBDatabaseReconciler) finalizeDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
+	if stringutils.ContainsString(db.ObjectMeta.Finalizers, v1beta1.Finalizer) {
+		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, v1beta1.Finalizer)
+		if err := r.Update(ctx, &db); err != nil {
+			return db, err
+		}
+	}
+
+	return db, nil
 }
 
 func (r *MongoDBDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.MongoDBDatabase) error {

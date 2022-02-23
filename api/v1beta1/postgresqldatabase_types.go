@@ -17,13 +17,24 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// Extension is a resource representing database extension
+type Extension struct {
+	Name string `json:"name"`
+}
+
+// Extensions is a collection of Extension types
+type Extensions []Extension
 
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
+
+	// Database extensions
+	// +optional
+	Extensions Extensions `json:"extensions,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -37,6 +48,9 @@ type PostgreSQLDatabaseStatus struct {
 	// Conditions holds the conditions for the PostgreSQLDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient
@@ -57,15 +71,11 @@ type PostgreSQLDatabase struct {
 	Status PostgreSQLDatabaseStatus `json:"status,omitempty"`
 }
 
-func (in *PostgreSQLDatabase) GetAtlasGroupId() string {
-	return ""
-}
-
-func (in *PostgreSQLDatabase) GetAddress() string {
-	return in.Spec.Address
-}
-
 func (in *PostgreSQLDatabase) GetRootSecret() *SecretReference {
+	if in.Spec.RootSecret.Namespace == "" {
+		in.Spec.RootSecret.Namespace = in.GetNamespace()
+	}
+
 	return in.Spec.RootSecret
 }
 
@@ -81,10 +91,6 @@ func (in *PostgreSQLDatabase) GetRootDatabaseName() string {
 	return ""
 }
 
-func (in *PostgreSQLDatabase) GetExtensions() Extensions {
-	return in.Spec.Extensions
-}
-
 // +kubebuilder:object:root=true
 
 // PostgreSQLDatabaseList contains a list of PostgreSQLDatabase
@@ -94,32 +100,8 @@ type PostgreSQLDatabaseList struct {
 	Items           []PostgreSQLDatabase `json:"items"`
 }
 
-// If object doesn't contain finalizer, set it and call update function 'updateF'.
-// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-func (d *PostgreSQLDatabase) SetFinalizer(updateF func() error) error {
-	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return nil
-	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
-		return updateF()
-	}
-	return nil
-}
-
-// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-// Call finalize function 'finalizeF', which should handle finalization logic.
-// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-func (d *PostgreSQLDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
-	if d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
-		return true, updateF()
-	}
-	return true, nil
+func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func (d *PostgreSQLDatabase) SetDefaults() error {

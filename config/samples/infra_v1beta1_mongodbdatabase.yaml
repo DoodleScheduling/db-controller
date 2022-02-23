@@ -9,22 +9,11 @@ spec:
     name: mongodb
     passwordField: "mongodb-root-password"
 ---
-apiVersion: dbprovisioning.infra.doodle.com/v1beta1
-kind: MongoDBUser
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  database:
-    name: my-app
-  credentials:
-    name: my-app-mongodb
----
 apiVersion: v1
 kind: Secret
 metadata:
-  name: my-app-mongodb
+  name: mongodb
   namespace: default
 data:
-  password: MTIzNA==
+  mongodb-root-password: MTIzNA==
   username: MTIzNA==

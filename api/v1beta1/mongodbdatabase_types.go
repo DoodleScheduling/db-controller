@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,6 +37,9 @@ type MongoDBDatabaseStatus struct {
 	// Conditions holds the conditions for the MongoDBDatabase.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient
@@ -58,15 +60,11 @@ type MongoDBDatabase struct {
 	Status MongoDBDatabaseStatus `json:"status,omitempty"`
 }
 
-func (in *MongoDBDatabase) GetAtlasGroupId() string {
-	return in.Spec.AtlasGroupId
-}
-
-func (in *MongoDBDatabase) GetAddress() string {
-	return in.Spec.Address
-}
-
 func (in *MongoDBDatabase) GetRootSecret() *SecretReference {
+	if in.Spec.RootSecret.Namespace == "" {
+		in.Spec.RootSecret.Namespace = in.GetNamespace()
+	}
+
 	return in.Spec.RootSecret
 }
 
@@ -82,10 +80,6 @@ func (in *MongoDBDatabase) GetRootDatabaseName() string {
 	return ""
 }
 
-func (in *MongoDBDatabase) GetExtensions() Extensions {
-	return in.Spec.Extensions
-}
-
 // +kubebuilder:object:root=true
 
 // MongoDBDatabaseList contains a list of MongoDBDatabase
@@ -93,34 +87,6 @@ type MongoDBDatabaseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []MongoDBDatabase `json:"items"`
-}
-
-// If object doesn't contain finalizer, set it and call update function 'updateF'.
-// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-func (d *MongoDBDatabase) SetFinalizer(updateF func() error) error {
-	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return nil
-	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
-		return updateF()
-	}
-	return nil
-}
-
-// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-// Call finalize function 'finalizeF', which should handle finalization logic.
-// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-func (d *MongoDBDatabase) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
-	if d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
-		return true, updateF()
-	}
-	return true, nil
 }
 
 func (d *MongoDBDatabase) SetDefaults() error {

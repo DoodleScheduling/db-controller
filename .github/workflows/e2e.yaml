@@ -1,0 +1,133 @@
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  kind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Restore Go cache
+        uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-ghcache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-ghcache-
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
+      - name: Setup Kubernetes
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: v0.11.1
+          image: kindest/node:v1.21.1@sha256:69860bda5563ac81e3c0057d654b5253219618a22ec3a346306239bba8cfa1a6
+      - name: Setup Kustomize
+        uses: fluxcd/pkg/actions/kustomize@main
+      - name: Setup envtest
+        uses: fluxcd/pkg/actions/envtest@main
+        with:
+          version: "1.21.2"
+      - name: Setup Helm
+        uses: fluxcd/pkg/actions/helm@main
+      - name: Run controller tests
+        run: make test
+      - name: Check if working tree is dirty
+        run: |
+          if [[ $(git diff --stat) != '' ]]; then
+            git --no-pager diff
+            echo 'run make test and commit changes'
+            exit 1
+          fi
+      - name: Build container image
+        run: |
+          make docker-build IMG=test/k8sdb-controller:latest BUILD_PLATFORMS=linux/amd64 \
+            BUILD_ARGS="--cache-from=type=local,src=/tmp/.buildx-cache \
+            --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max"
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Load test image
+        run: kind load docker-image test/k8sdb-controller:latest
+      - name: Deploy controller
+        run: make deploy IMG=test/k8sdb-controller:latest
+      - name: Setup MongoDB
+        env:
+          MONGODB_VER: ${{ '10.29.2' }}
+        run: |
+          kubectl create ns mongodb
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm upgrade --wait -i mongodb bitnami/mongodb \
+          --version $MONGODB_VER \
+          --namespace mongodb \
+          --set auth.rootPassword=password \
+          --set persistence.enabled=false
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodb/root-secret.yaml
+      - name: Run MongoDB tests
+        run: |
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodbdatabase
+          kubectl -n k8sdb-system apply -f ./config/testdata/mongodbuser
+          kubectl -n k8sdb-system wait mongodbdatabase/admin --for=condition=DatabaseReady --timeout=1m
+          kubectl -n k8sdb-system wait mongodbuser/foo --for=condition=UserReady --timeout=1m
+          kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
+          kubectl -n k8sdb-system delete -f ./config/testdata/mongodbuser
+          ! kubectl -n mongodb exec -ti deployment/mongodb mongodb -- mongo mongodb://localhost:27017/foo --authenticationDatabase=admin -u foo -p password --eval 'db.bar.insert({"foo":"bar"})'
+      - name: Setup PostgreSQL
+        env:
+          POSTGRESQL_VER: ${{ '10.13.8' }}
+        run: |
+          kubectl create ns postgresql
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm upgrade --wait -i postgresql bitnami/postgresql \
+          --version $POSTGRESQL_VER \
+          --namespace postgresql \
+          --set postgresqlPassword=password \
+          --set persistence.enabled=false
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresql/root-secret.yaml
+      - name: Run PostgreSQL tests
+        run: |
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresqldatabase
+          kubectl -n k8sdb-system apply -f ./config/testdata/postgresqluser
+          kubectl -n k8sdb-system wait postgresqldatabase/foo --for=condition=DatabaseReady --timeout=1m
+          kubectl -n k8sdb-system wait postgresqluser/foo --for=condition=UserReady --timeout=1m
+          kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- bash -c "PGPASSWORD=password psql -h localhost -U foo foo -c '\l'"
+          kubectl -n k8sdb-system delete -f ./config/testdata/postgresqluser
+          ! kubectl -n postgresql exec -ti sts/postgresql-postgresql postgresql -- bash -c "PGPASSWORD=password psql -h localhost -U foo foo -c '\l'"
+      - name: Logs
+        run: |
+          kubectl -n k8sdb-system logs deploy/k8sdb-controller
+      - name: Debug failure
+        if: failure()
+        run: |
+          kubectl -n kube-system describe pods
+          kubectl -n k8sdb-system describe pods
+          kubectl -n k8sdb-system get mongodbdatabase -oyaml
+          kubectl -n k8sdb-system get mongodbuser -oyaml
+          kubectl -n k8sdb-system get postgresqldatabase -oyaml
+          kubectl -n k8sdb-system get postgresqluser -oyaml
+          kubectl -n k8sdb-system get all
+          kubectl -n k8sdb-system logs deploy/k8sdb-controller
+          kubectl -n mongodb get all
+          kubectl -n postgresql get all

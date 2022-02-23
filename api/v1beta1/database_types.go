@@ -19,19 +19,20 @@ const (
 
 // Status reasons
 const (
-	SecretNotFoundReason                = "SecretNotFoundFailed"
-	ConnectionFailedReason              = "ConnectionFailed"
-	DatabaseProvisioningFailedReason    = "DatabaseProvisioningFailed"
-	DatabaseProvisiningSuccessfulReason = "DatabaseProvisiningSuccessful"
-	DatabaseNotFoundReason              = "DatabaseNotFoundReason"
-	UserNotProvisionedReason            = "UserNotProvisioned"
-	UserProvisioningSuccessfulReason    = "UserProvisioningSuccessful"
-	CredentialsNotFoundReason           = "CredentialsNotFound"
-	CreateDatabaseFailedReason          = "CreateDatabaseFailed"
-	CreateExtensionFailedReason         = "CreateExtensionFailed"
+	SecretNotFoundReason                 = "SecretNotFoundFailed"
+	ConnectionFailedReason               = "ConnectionFailed"
+	DatabaseProvisioningFailedReason     = "DatabaseProvisioningFailed"
+	DatabaseProvisioningSuccessfulReason = "DatabaseProvisiningSuccessful"
+	DatabaseNotFoundReason               = "DatabaseNotFoundReason"
+	UserNotProvisionedReason             = "UserNotProvisioned"
+	UserProvisioningSuccessfulReason     = "UserProvisioningSuccessful"
+	CredentialsNotFoundReason            = "CredentialsNotFound"
+	CreateDatabaseFailedReason           = "CreateDatabaseFailed"
+	CreateExtensionFailedReason          = "CreateExtensionFailed"
+	ProgressingReason                    = "ProgressingReason"
 )
 
-// DatabaseSpec defines the desired state of MongoDBDatabase
+// DatabaseSpec defines the desired state of a *Database
 type DatabaseSpec struct {
 	// DatabaseName is by default the same as metata.name
 	// +optional
@@ -44,10 +45,6 @@ type DatabaseSpec struct {
 	// Contains a credentials set of a user with enough permission to manage databases and user accounts
 	// +required
 	RootSecret *SecretReference `json:"rootSecret"`
-
-	// Database extensions
-	// +optional
-	Extensions Extensions `json:"extensions,omitempty"`
 }
 
 // DatabaseReference is a named reference to a database kind
@@ -63,6 +60,10 @@ type SecretReference struct {
 	// +required
 	Name string `json:"name"`
 
+	// Namespace, by default the same namespace is used.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
 	// +optional
 	// +kubebuilder:default:=username
 	UserField string `json:"userField"`
@@ -71,21 +72,6 @@ type SecretReference struct {
 	// +kubebuilder:default:=password
 	PasswordField string `json:"passwordField"`
 }
-
-type Role struct {
-	Name string `json:"name"`
-
-	// +optional
-	DB string `json:"db,omitempty"`
-}
-
-// Extension is a resource representing database extension
-type Extension struct {
-	Name string `json:"name"`
-}
-
-// Extensions is a collection of Extension types
-type Extensions []Extension
 
 // conditionalResource is a resource with conditions
 type conditionalResource interface {
@@ -98,10 +84,6 @@ func DatabaseNotReadyCondition(in conditionalResource, reason, message string) {
 
 func DatabaseReadyCondition(in conditionalResource, reason, message string) {
 	setResourceCondition(in, DatabaseReadyConditionType, metav1.ConditionTrue, reason, message)
-}
-
-func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
-	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
 }
 
 func UserNotReadyCondition(in conditionalResource, reason, message string) {

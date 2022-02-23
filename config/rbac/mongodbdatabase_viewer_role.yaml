@@ -5,7 +5,7 @@ metadata:
   name: mongodbdatabase-viewer-role
 rules:
 - apiGroups:
-  - infra.doodle.com
+  - dbprovisioning.infra.doodle.com
   resources:
   - mongodbdatabases
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - infra.doodle.com
+  - dbprovisioning.infra.doodle.com
   resources:
   - mongodbdatabases/status
   verbs:

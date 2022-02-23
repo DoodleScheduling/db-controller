@@ -1,7 +1,10 @@
 apiVersion: v2
-appVersion: 0.0.0
+appVersion: v0.0.1
 description: A kubernetes controller to deploy databases
 home: https://github.com/DoodleScheduling/k8sdb-controller
+maintainers:
+- name: devops
+  email: devops@doodle.com
 keywords:
 - kubernetes-controller
 - mongodb
@@ -9,4 +12,4 @@ keywords:
 name: k8sdb-controller
 sources:
 - https://github.com/DoodleScheduling/k8sdb-controller
-version: 0.0.0
+version: 0.1.0

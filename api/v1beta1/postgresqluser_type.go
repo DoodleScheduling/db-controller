@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,6 +39,13 @@ type PostgreSQLUserStatus struct {
 	// Conditions holds the conditions for the PostgreSQLUser.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Username of the created user.
+	// +optional
+	Username string `json:"username,omitempty"`
+
+	// ObservedGeneration is the last generation reconciled by the controller
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient
@@ -65,12 +71,12 @@ func (in *PostgreSQLUser) GetDatabase() string {
 }
 
 func (in *PostgreSQLUser) GetCredentials() *SecretReference {
-	return in.Spec.Credentials
-}
+	sec := in.Spec.Credentials
+	if sec.Namespace == "" {
+		sec.Namespace = in.GetNamespace()
+	}
 
-func (in *PostgreSQLUser) GetRoles() []Role {
-	// NOOP
-	return []Role{}
+	return sec
 }
 
 // +kubebuilder:object:root=true
@@ -80,34 +86,6 @@ type PostgreSQLUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PostgreSQLUser `json:"items"`
-}
-
-// If object doesn't contain finalizer, set it and call update function 'updateF'.
-// Only do this if object is not being deleted (judged by DeletionTimestamp being zero)
-func (d *PostgreSQLUser) SetFinalizer(updateF func() error) error {
-	if !d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return nil
-	}
-	if !stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		d.ObjectMeta.Finalizers = append(d.ObjectMeta.Finalizers, Finalizer)
-		return updateF()
-	}
-	return nil
-}
-
-// Finalize object if deletion timestamp is not zero (i.e. object is being deleted).
-// Call finalize function 'finalizeF', which should handle finalization logic.
-// Remove finalizer from the object (so that object can be deleted), and update by calling update function 'updateF'.
-func (d *PostgreSQLUser) Finalize(updateF func() error, finalizeF func() error) (bool, error) {
-	if d.ObjectMeta.DeletionTimestamp.IsZero() {
-		return false, nil
-	}
-	if stringutils.ContainsString(d.ObjectMeta.Finalizers, Finalizer) {
-		_ = finalizeF()
-		d.ObjectMeta.Finalizers = stringutils.RemoveString(d.ObjectMeta.Finalizers, Finalizer)
-		return true, updateF()
-	}
-	return true, nil
 }
 
 func init() {
