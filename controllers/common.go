@@ -21,6 +21,10 @@ const (
 	dbIndexKey          string = ".metadata.database"
 )
 
+type userDropper interface {
+	DropUser(ctx context.Context, db, username string) error
+}
+
 // objectKey returns c.ObjectKey for the object.
 func objectKey(object metav1.Object) client.ObjectKey {
 	return client.ObjectKey{
@@ -47,13 +51,23 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 		pw   string
 	)
 
-	if val, ok := secret.Data[credentials.UserField]; !ok {
+	userField := credentials.UserField
+	if userField == "" {
+		userField = "username"
+	}
+
+	pwField := credentials.PasswordField
+	if pwField == "" {
+		pwField = "password"
+	}
+
+	if val, ok := secret.Data[userField]; !ok {
 		return "", "", errors.New("Defined username field not found in secret")
 	} else {
 		user = string(val)
 	}
 
-	if val, ok := secret.Data[credentials.PasswordField]; !ok {
+	if val, ok := secret.Data[pwField]; !ok {
 		return "", "", errors.New("Defined password field not found in secret")
 	} else {
 		pw = string(val)
@@ -128,7 +142,7 @@ func getSecret(ctx context.Context, c client.Client, sec *infrav1beta1.SecretRef
 
 	usr, pw, err := extractCredentials(sec, secret)
 	if err != nil {
-		return usr, pw, fmt.Errorf("Credentials field not found in referenced rootSecret: %w", err)
+		return usr, pw, fmt.Errorf("Credentials field not found in referenced secret: %w", err)
 	}
 
 	return usr, pw, err

@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,12 +28,20 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 )
+
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqldatabases/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // PostgreSQLDatabaseReconciler reconciles a PostgreSQLDatabase object
 type PostgreSQLDatabaseReconciler struct {
@@ -90,10 +97,6 @@ func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) 
 	return reqs
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLdatabases/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-
 func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("PostgreSQLDatabase", req.NamespacedName)
 	logger.Info("reconciling PostgreSQLDatabase")
@@ -110,26 +113,19 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	db.SetDefaults()
 
-	// set finalizer
-	if err := db.SetFinalizer(func() error {
-		return r.Update(ctx, &db)
-	}); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// finalize
-	if finalized, err := db.Finalize(func() error {
-		return r.Update(ctx, &db)
-	}, func() error {
-		return nil
-	}); err != nil {
-		return reconcile.Result{}, err
-	} else if finalized {
-		return reconcile.Result{}, nil
+	// examine DeletionTimestamp to determine if object is under deletion
+	if db.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !stringutils.ContainsString(db.GetFinalizers(), v1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&db, v1beta1.Finalizer)
+			if err := r.Update(ctx, &db); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	db, err := r.reconcile(ctx, db)
 	res := ctrl.Result{}
+	db.Status.ObservedGeneration = db.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&db, "Normal", "error", err.Error())
@@ -142,7 +138,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &db); err != nil {
-		log.Error(err, "unable to update status after reconciliation")
+		logger.Error(err, "unable to update status after reconciliation")
 		return ctrl.Result{Requeue: true}, err
 	}
 
@@ -166,6 +162,10 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 
 	defer rootDBHandler.Close(ctx)
 
+	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.finalizeDatabase(ctx, db)
+	}
+
 	err = rootDBHandler.CreateDatabaseIfNotExists(ctx, db.GetDatabaseName())
 	if err != nil {
 		err = fmt.Errorf("Failed to provision database: %w", err)
@@ -186,6 +186,17 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 		if err := dbHandler.EnableExtension(ctx, db.GetDatabaseName(), ext.Name); err != nil {
 			err = fmt.Errorf("Failed to create extension %s in database: %w", ext.Name, err)
 			infrav1beta1.ExtensionNotReadyCondition(&db, infrav1beta1.CreateExtensionFailedReason, err.Error())
+			return db, err
+		}
+	}
+
+	return db, nil
+}
+
+func (r *PostgreSQLDatabaseReconciler) finalizeDatabase(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
+	if stringutils.ContainsString(db.ObjectMeta.Finalizers, v1beta1.Finalizer) {
+		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, v1beta1.Finalizer)
+		if err := r.Update(ctx, &db); err != nil {
 			return db, err
 		}
 	}

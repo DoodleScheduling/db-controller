@@ -1,0 +1,13 @@
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: PostgreSQLDatabase
+metadata:
+  name: foo
+spec:
+  address: postgres://postgresql.postgresql:5432
+  databaseName: foo
+  extensions:
+  - name: pg_trgm
+  rootSecret:
+    name: postgresql-root
+    passwordField: password
+    userField: username

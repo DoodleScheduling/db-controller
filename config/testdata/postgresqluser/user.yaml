@@ -1,0 +1,11 @@
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: PostgreSQLUser
+metadata:
+  name: foo
+spec:
+  credentials:
+    name: postgresql-foo
+    passwordField: password
+    userField: username
+  database:
+    name: foo

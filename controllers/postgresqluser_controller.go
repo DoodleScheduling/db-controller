@@ -18,10 +18,11 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,12 +31,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
 	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
+	"github.com/doodlescheduling/k8sdb-controller/common/database"
+	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
 )
+
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqlusers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqlusers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // PostgreSQLUserReconciler reconciles a PostgreSQLUser object
 type PostgreSQLUserReconciler struct {
@@ -130,10 +140,6 @@ func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []
 	return reqs
 }
 
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLUsers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infra.doodle.com,resources=PostgreSQLUsers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-
 func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("PostgreSQLUser", req.NamespacedName)
 	logger.Info("reconciling PostgreSQLUser")
@@ -153,27 +159,19 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// set finalizer
-	if err := user.SetFinalizer(func() error {
-		return r.Update(ctx, &user)
-	}); err != nil {
-		return reconcile.Result{}, err
+	// examine DeletionTimestamp to determine if object is under deletion
+	if user.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !stringutils.ContainsString(user.GetFinalizers(), v1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&user, v1beta1.Finalizer)
+			if err := r.Update(ctx, &user); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
-	// finalize
-	if finalized, err := user.Finalize(func() error {
-		return r.Update(ctx, &user)
-	}, func() error {
-		_, err := r.reconcile(ctx, user, true)
-		return err
-	}); err != nil {
-		return reconcile.Result{}, err
-	} else if finalized {
-		return reconcile.Result{}, nil
-	}
-
-	user, err := r.reconcile(ctx, user, false)
+	user, err := r.reconcile(ctx, user)
 	res := ctrl.Result{}
+	user.Status.ObservedGeneration = user.GetGeneration()
 
 	if err != nil {
 		r.Recorder.Event(&user, "Normal", "error", err.Error())
@@ -186,14 +184,14 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
-		log.Error(err, "unable to update status after reconciliation")
+		logger.Error(err, "unable to update status after reconciliation")
 		return ctrl.Result{Requeue: true}, err
 	}
 
 	return res, nil
 }
 
-func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser, finalize bool) (infrav1beta1.PostgreSQLUser, error) {
+func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser) (infrav1beta1.PostgreSQLUser, error) {
 	// Fetch referencing database
 	var db infrav1beta1.PostgreSQLDatabase
 	databaseName := types.NamespacedName{
@@ -225,6 +223,10 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	defer dbHandler.Close(ctx)
 
+	if !user.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.finalizeUser(ctx, user, db, dbHandler)
+	}
+
 	// Fetch referencing secret
 	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
 
@@ -233,22 +235,55 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	if finalize == true {
-		err = dbHandler.DropUser(ctx, db.GetDatabaseName(), usr)
-		if err != nil {
-			err = fmt.Errorf("Failed to remove user account: %w", err)
-			infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
-			return user, err
-		}
-
-		return user, nil
-	}
-
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw)
 	if err != nil {
 		err = fmt.Errorf("Failed to provison user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
+	}
+
+	user.Status.Username = usr
+
+	return user, nil
+}
+
+func generateToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
+}
+
+func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, dbHandler *database.PostgreSQLRepository) (infrav1beta1.PostgreSQLUser, error) {
+	if user.Status.Username == "" {
+		return user, nil
+	}
+
+	//We can't easily drop a user from postgres since it ownes objects
+	//err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
+
+	//Instead privileges are revoked and the password gets randomized
+	err := dbHandler.SetupUser(ctx, db.GetDatabaseName(), user.Status.Username, generateToken(32))
+	if err != nil {
+		err = fmt.Errorf("Failed to update user account: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	err = dbHandler.RevokeAllPrivileges(ctx, db.GetDatabaseName(), user.Status.Username)
+
+	if err != nil {
+		err = fmt.Errorf("Failed to revoke privileges from user account: %w", err)
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		return user, err
+	}
+
+	if stringutils.ContainsString(user.ObjectMeta.Finalizers, v1beta1.Finalizer) {
+		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, v1beta1.Finalizer)
+		if err := r.Update(ctx, &user); err != nil {
+			return user, err
+		}
 	}
 
 	return user, nil

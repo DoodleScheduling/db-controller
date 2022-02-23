@@ -9,73 +9,20 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - get
   - list
   - watch
 - apiGroups:
-  - infra.doodle.com
-  resources:
-  - MongoDBUsers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - MongoDBUsers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - PostgreSQLUsers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - PostgreSQLUsers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - PostgreSQLdatabases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - infra.doodle.com
-  resources:
-  - PostgreSQLdatabases/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infra.doodle.com
+  - dbprovisioning.infra.doodle.com
   resources:
   - mongodbdatabases
   verbs:
@@ -87,9 +34,69 @@ rules:
   - update
   - watch
 - apiGroups:
-  - infra.doodle.com
+  - dbprovisioning.infra.doodle.com
   resources:
   - mongodbdatabases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - mongodbusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - mongodbusers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - postgresqldatabases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - postgresqldatabases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - postgresqlusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbprovisioning.infra.doodle.com
+  resources:
+  - postgresqlusers/status
   verbs:
   - get
   - patch

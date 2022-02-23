@@ -1,7 +1,14 @@
 # Database controller
 
-Kubernetes Controller that deals with database and user provisioning.
-**Note**: This controller does not deploy database servers but rather manage on top of existing ones, use existing operators for this.
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/4787/badge)](https://bestpractices.coreinfrastructure.org/projects/4787)
+[![e2e](https://github.com/DoodleScheduling/k8sdb-controller/workflows/e2e/badge.svg)](https://github.com/DoodleScheduling/k8sdb-controller/actions)
+[![report](https://goreportcard.com/badge/github.com/DoodleScheduling/k8sdb-controller)](https://goreportcard.com/report/github.com/DoodleScheduling/k8sdb-controller)
+[![license](https://img.shields.io/github/license/DoodleScheduling/k8sdb-controller.svg)](https://github.com/DoodleScheduling/k8sdb-controller/blob/main/LICENSE)
+[![release](https://img.shields.io/github/release/DoodleScheduling/k8sdb-controller/all.svg)](https://github.com/DoodleScheduling/k8sdb-controller/releases)
+
+Kubernetes Controller for database and user provisioning.
+
+**Note**: This controller does not deploy database servers. It is meant for managing existing ones either deployed by other controllers or manually.
 
 ## Example for PostgreSQL
 

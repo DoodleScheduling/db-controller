@@ -1,0 +1,14 @@
+apiVersion: dbprovisioning.infra.doodle.com/v1beta1
+kind: MongoDBUser
+metadata:
+  name: foo
+spec:
+  credentials:
+    name: mongodb-foo
+    passwordField: password
+    userField: username
+  database:
+    name: admin
+  roles:
+  - db: foo
+    name: readWrite
