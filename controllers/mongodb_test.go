@@ -103,7 +103,7 @@ var _ = Describe("MongoDB", func() {
 
 		namespace, _ := setupNamespace()
 
-		It("creates database", func() {
+		It("creates user", func() {
 			keyUser = types.NamespacedName{
 				Name:      "mongodbuser-" + randStringRunes(5),
 				Namespace: namespace.Name,
@@ -149,7 +149,7 @@ var _ = Describe("MongoDB", func() {
 
 		namespace, _ := setupNamespace()
 
-		It("adds database", func() {
+		It("creates database", func() {
 			keyDB = types.NamespacedName{
 				Name:      "mongodbdatabase-" + randStringRunes(5),
 				Namespace: namespace.Name,

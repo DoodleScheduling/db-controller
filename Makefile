@@ -3,7 +3,7 @@
 IMG ?= ghcr.io/doodlescheduling/k8sdb-controller:latest
 
 # Produce CRDs that work back to Kubernetes 1.16
-CRD_OPTIONS ?= crd:crdVersions=v1 
+CRD_OPTIONS ?= crd:crdVersions=v1
 
 # API (doc) generation utilities
 CONTROLLER_GEN_VERSION ?= v0.5.0
@@ -45,6 +45,7 @@ deploy: manifests
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/* chart/k8sdb-controller/crds/
 
 # Run go fmt against code
 fmt:

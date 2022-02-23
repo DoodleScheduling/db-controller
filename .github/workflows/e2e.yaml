@@ -49,7 +49,7 @@ jobs:
       - name: Setup envtest
         uses: fluxcd/pkg/actions/envtest@main
         with:
-          version: "1.19.2"
+          version: "1.21.2"
       - name: Setup Helm
         uses: fluxcd/pkg/actions/helm@main
       - name: Run controller tests

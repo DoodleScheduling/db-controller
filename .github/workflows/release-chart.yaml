@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - DK-2793
 
 jobs:
   release:

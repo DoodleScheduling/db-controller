@@ -98,7 +98,7 @@ var _ = Describe("PostgreSQL", func() {
 
 		namespace, _ := setupNamespace()
 
-		It("creates database", func() {
+		It("creates user", func() {
 			keyUser = types.NamespacedName{
 				Name:      "postgresuser-" + randStringRunes(5),
 				Namespace: namespace.Name,
@@ -144,7 +144,7 @@ var _ = Describe("PostgreSQL", func() {
 
 		namespace, _ := setupNamespace()
 
-		It("adds database", func() {
+		It("creates database", func() {
 			keyDB = types.NamespacedName{
 				Name:      "postgresdatabase-" + randStringRunes(5),
 				Namespace: namespace.Name,
