@@ -1,16 +1,19 @@
 # Database controller
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/4787/badge)](https://bestpractices.coreinfrastructure.org/projects/4787)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5643/badge)](https://bestpractices.coreinfrastructure.org/projects/5643)
 [![e2e](https://github.com/DoodleScheduling/k8sdb-controller/workflows/e2e/badge.svg)](https://github.com/DoodleScheduling/k8sdb-controller/actions)
 [![report](https://goreportcard.com/badge/github.com/DoodleScheduling/k8sdb-controller)](https://goreportcard.com/report/github.com/DoodleScheduling/k8sdb-controller)
-[![license](https://img.shields.io/github/license/DoodleScheduling/k8sdb-controller.svg)](https://github.com/DoodleScheduling/k8sdb-controller/blob/main/LICENSE)
+[![license](https://img.shields.io/github/license/DoodleScheduling/k8sdb-controller.svg)](https://github.com/DoodleScheduling/k8sdb-controller/blob/master/LICENSE)
 [![release](https://img.shields.io/github/release/DoodleScheduling/k8sdb-controller/all.svg)](https://github.com/DoodleScheduling/k8sdb-controller/releases)
 
 Kubernetes Controller for database and user provisioning.
-
-**Note**: This controller does not deploy database servers. It is meant for managing existing ones either deployed by other controllers or manually.
+Currently the controller supports Postgres and MongoDB (as well as MongoDB Atlas).
+Using the controller you can deploy databases and users defined as code on top of kubernetes.
+How to deploy database servers is out of scope of this project.
 
 ## Example for PostgreSQL
+
+Example of how to deploy a Postgres database called my-app as well as a user to the server localhost:5432.
 
 ```yaml
 apiVersion: v1
@@ -54,6 +57,9 @@ data:
 ```
 
 ## Example for MongoDB
+
+Example of how to deploy a MongoDB database called my-app as well as a user to the server localhost:5432.
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -97,29 +103,40 @@ data:
   username: MTIzNA==
 ```
 
-## Helm chart
+## Installation
 
-Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller) for the helm chart docs.
+### Helm
+
+Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller/tree/master/chart/k8stcpmap-controller) for the helm chart docs.
+
+### Manifests/kustomize
+
+Alternatively you may get the bundled manifests in each release to deploy it using kustomize or use them directly.
+
+## Limitations
+
+By design there is no garbage collection implemented for databases. Meaning a database does not get dropped if the kubernetes resources is removed.
+However this is not the case for users. Users will be removed from the corresponding databases if the referenced kubernetes resource gets removed.
+We might reconsider this in the future.
 
 ## Profiling
-To profile controller, access web server on #profilerPort (default 6060). 
+To profile controller, access web server on #profilerPort (default 6060).
 
 In Kubernetes, port-forward to this port, and open the `/debug/pprof` URL in browser. For example, if you port-forward 6060 from container to 6060 on your machine, access:
 ```
 http://localhost:6060/debug/pprof/
 ```
 
-## Limitations
-
-Currently there is no garbage collection implemented, meaning all the things created are not removed.
-This will be at least implemented for user provisioning. Discussion will stay open for databases.
-
 ## Configure the controller
 
-ENV Variable | Argument | Default value | Example | Purpose |
--------------|----------|---------------|---------|---------|
-METRICS_ADDR | --metrics-addr | :8080 | :8080 | Metrics port |
-ENABLE_LEADER_ELECTION | --enable-leader-election | false | true | Enable leader election |
-LEADER_ELECTION_NAMESPACE | --leader-election-namespace | "" | devops | Leader election namespace. Default is the same as controller.
-NAMESPACES | --namespaces | "" | devops,default |  Namespaces to watch. Default: watch all namespaces |
-MAX_CONCURRENT_RECONCILES | --max-concurrent-reconciles | 1 | 5 | Maximum concurrent reconciles per controller. This config covers all controllers. |
+You may change base settings for the controller using env variables (or alternatively command line arguments).
+Available env variables:
+
+| Name  | Description | Default |
+|-------|-------------| --------|
+| `METRICS_ADDR` | The address of the metric endpoint binds to. | `:9556` |
+| `PROBE_ADDR` | The address of the probe endpoints binds to. | `:9557` |
+| `ENABLE_LEADER_ELECTION` | Enable leader election for controller manager. | `false` |
+| `LEADER_ELECTION_NAMESPACE` | Change the leader election namespace. This is by default the same where the controller is deployed. | `` |
+| `NAMESPACES` | The controller listens by default for all namespaces. This may be limited to a comma delimited list of dedicated namespaces. | `` |
+| `CONCURRENT` | The number of concurrent reconcile workers.  | `1` |
