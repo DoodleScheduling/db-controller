@@ -37,8 +37,8 @@ podAnnotations: {}
 #  prometheus.io/scrape: "true"
 #  prometheus.io/port: "metrics"
 
-metricsPort: "8080"
-probesPort: "9558"
+metricsPort: "9556"
+probesPort: "9557"
 profilerPort: "6060"
 
 # Change the metrics path

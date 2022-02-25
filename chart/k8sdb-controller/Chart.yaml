@@ -12,4 +12,4 @@ keywords:
 name: k8sdb-controller
 sources:
 - https://github.com/DoodleScheduling/k8sdb-controller
-version: 0.1.0
+version: 0.1.1
