@@ -3,6 +3,25 @@ entries:
   k8sdb-controller:
   - apiVersion: v2
     appVersion: v0.0.1
+    created: "2022-03-24T09:55:18.827566239Z"
+    description: A kubernetes controller to deploy databases
+    digest: 9487e248c5b7522bd01290756c9f944191d9b2f1584b9ce7a3a7110d9bb65467
+    home: https://github.com/DoodleScheduling/k8sdb-controller
+    keywords:
+    - kubernetes-controller
+    - mongodb
+    - postgresql
+    maintainers:
+    - email: devops@doodle.com
+      name: devops
+    name: k8sdb-controller
+    sources:
+    - https://github.com/DoodleScheduling/k8sdb-controller
+    urls:
+    - https://github.com/DoodleScheduling/k8sdb-controller/releases/download/k8sdb-controller-0.1.2/k8sdb-controller-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v2
+    appVersion: v0.0.1
     created: "2022-03-10T07:53:08.229113479Z"
     description: A kubernetes controller to deploy databases
     digest: 742c27c4e9f121a45224fb504f8a9162640864785128660d1a53de55487904c7
@@ -20,4 +39,4 @@ entries:
     urls:
     - https://github.com/DoodleScheduling/k8sdb-controller/releases/download/k8sdb-controller-0.1.1/k8sdb-controller-0.1.1.tgz
     version: 0.1.1
-generated: "2022-03-10T07:53:08.229118079Z"
+generated: "2022-03-24T09:55:18.827582939Z"
