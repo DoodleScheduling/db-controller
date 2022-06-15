@@ -107,7 +107,7 @@ data:
 
 ### Helm
 
-Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller/tree/master/chart/k8stcpmap-controller) for the helm chart docs.
+Please see [chart/k8sdb-controller](https://github.com/DoodleScheduling/k8sdb-controller/tree/master/chart/k8sdb-controller) for the helm chart docs.
 
 ### Manifests/kustomize
 
