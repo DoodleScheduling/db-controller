@@ -116,7 +116,7 @@ func (m *MongoDBRepository) doesUserExist(ctx context.Context, database string, 
 		return false, err
 	}
 
-	return users != nil && len(users) > 0, nil
+	return len(users) > 0, nil
 }
 
 func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, username string) (MongoDBUsers, error) {

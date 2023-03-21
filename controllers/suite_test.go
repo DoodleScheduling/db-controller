@@ -25,7 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -151,7 +150,7 @@ func setupNamespace() (*v1.Namespace, *v1.Secret) {
 		interval = time.Second * 1
 	)
 
-	namespace := &corev1.Namespace{
+	namespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "ns-" + randStringRunes(5)},
 	}
 
@@ -159,7 +158,7 @@ func setupNamespace() (*v1.Namespace, *v1.Secret) {
 		Name:      "secret-" + randStringRunes(5),
 		Namespace: namespace.Name,
 	}
-	createdSecret := &corev1.Secret{
+	createdSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      keyRootSecret.Name,
 			Namespace: keyRootSecret.Namespace,

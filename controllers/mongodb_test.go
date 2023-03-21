@@ -30,7 +30,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -405,7 +404,7 @@ var _ = Describe("MongoDB", func() {
 
 		It("adds secret", func() {
 			password = randStringRunes(5)
-			createdSecret = &corev1.Secret{
+			createdSecret = &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      keySecret.Name,
 					Namespace: keySecret.Namespace,
@@ -507,7 +506,7 @@ var _ = Describe("MongoDB", func() {
 
 			It("adds secret", func() {
 				password = randStringRunes(5)
-				createdSecret = &corev1.Secret{
+				createdSecret = &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      keySecret.Name,
 						Namespace: keySecret.Namespace,

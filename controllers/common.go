@@ -62,13 +62,13 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	}
 
 	if val, ok := secret.Data[userField]; !ok {
-		return "", "", errors.New("Defined username field not found in secret")
+		return "", "", errors.New("defined username field not found in secret")
 	} else {
 		user = string(val)
 	}
 
 	if val, ok := secret.Data[pwField]; !ok {
-		return "", "", errors.New("Defined password field not found in secret")
+		return "", "", errors.New("defined password field not found in secret")
 	} else {
 		pw = string(val)
 	}
@@ -84,7 +84,7 @@ func setupAtlas(ctx context.Context, db infrav1beta1.MongoDBDatabase, pubKey, pr
 	})
 
 	if err != nil {
-		return handler, fmt.Errorf("Failed to setup connection to mongodb atlas: %w", err)
+		return handler, fmt.Errorf("failed to setup connection to mongodb atlas: %w", err)
 	}
 
 	return handler, nil
@@ -97,14 +97,14 @@ func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, us
 		Password: pw,
 	}
 
-	if switchDB == true {
+	if switchDB {
 		opts.DatabaseName = db.GetDatabaseName()
 	}
 
 	handler, err := database.NewPostgreSQLRepository(context.TODO(), opts)
 
 	if err != nil {
-		return handler, fmt.Errorf("Failed to setup connection to postgres server: %w", err)
+		return handler, fmt.Errorf("failed to setup connection to postgres server: %w", err)
 	}
 
 	return handler, nil
@@ -120,7 +120,7 @@ func setupMongoDB(ctx context.Context, db infrav1beta1.MongoDBDatabase, usr, pw 
 	})
 
 	if err != nil {
-		return handler, fmt.Errorf("Failed to setup connection to mongodb: %w", err)
+		return handler, fmt.Errorf("failed to setup connection to mongodb: %w", err)
 	}
 
 	return handler, nil
@@ -137,12 +137,12 @@ func getSecret(ctx context.Context, c client.Client, sec *infrav1beta1.SecretRef
 
 	// Failed to fetch referenced secret, requeue immediately
 	if err != nil {
-		return "", "", fmt.Errorf("Referencing secret was not found: %w", err)
+		return "", "", fmt.Errorf("referencing secret was not found: %w", err)
 	}
 
 	usr, pw, err := extractCredentials(sec, secret)
 	if err != nil {
-		return usr, pw, fmt.Errorf("Credentials field not found in referenced secret: %w", err)
+		return usr, pw, fmt.Errorf("credentials field not found in referenced secret: %w", err)
 	}
 
 	return usr, pw, err

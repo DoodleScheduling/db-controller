@@ -540,7 +540,7 @@ var _ = Describe("PostgreSQL", func() {
 			})
 
 			It("has write access to the referenced role database", func() {
-				_, err := client.Exec(ctx, fmt.Sprintf("CREATE TABLE foo (key integer);"))
+				_, err := client.Exec(ctx, fmt.Sprintln("CREATE TABLE foo (key integer);"))
 				Expect(err).NotTo(HaveOccurred(), "failed to insert doc")
 			})
 

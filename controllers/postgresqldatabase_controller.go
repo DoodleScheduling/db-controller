@@ -111,7 +111,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	db.SetDefaults()
+	_ = db.SetDefaults()
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if db.ObjectMeta.DeletionTimestamp.IsZero() {
