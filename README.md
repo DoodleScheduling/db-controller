@@ -1,10 +1,10 @@
 # Database controller
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5643/badge)](https://bestpractices.coreinfrastructure.org/projects/5643)
-[![e2e](https://github.com/DoodleScheduling/k8sdb-controller/workflows/e2e/badge.svg)](https://github.com/DoodleScheduling/k8sdb-controller/actions)
-[![report](https://goreportcard.com/badge/github.com/DoodleScheduling/k8sdb-controller)](https://goreportcard.com/report/github.com/DoodleScheduling/k8sdb-controller)
-[![license](https://img.shields.io/github/license/DoodleScheduling/k8sdb-controller.svg)](https://github.com/DoodleScheduling/k8sdb-controller/blob/master/LICENSE)
 [![release](https://img.shields.io/github/release/DoodleScheduling/k8sdb-controller/all.svg)](https://github.com/DoodleScheduling/k8sdb-controller/releases)
+[![release](https://github.com/doodlescheduling/k8sdb-controller/actions/workflows/release.yaml/badge.svg)](https://github.com/doodlescheduling/k8sdb-controller/actions/workflows/release.yaml)
+[![report](https://goreportcard.com/badge/github.com/DoodleScheduling/k8sdb-controller)](https://goreportcard.com/report/github.com/DoodleScheduling/k8sdb-controller)
+[![Coverage Status](https://coveralls.io/repos/github/DoodleScheduling/k8sdb-controller/badge.svg?branch=master)](https://coveralls.io/github/DoodleScheduling/k8sdb-controller?branch=master)
+[![license](https://img.shields.io/github/license/DoodleScheduling/k8sdb-controller.svg)](https://github.com/DoodleScheduling/k8sdb-controller/blob/master/LICENSE)
 
 Kubernetes Controller for database and user provisioning.
 Currently the controller supports Postgres and MongoDB (as well as MongoDB Atlas).
