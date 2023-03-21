@@ -63,4 +63,3 @@ Determine configmap name, can either be the self-created of an existing one
     {{ include "k8sdb-controller.fullname" . }}
 {{- end -}}
 {{- end -}}
-
