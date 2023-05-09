@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= k8sdb-controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 
@@ -71,7 +71,7 @@ test: manifests generate fmt vet tidy envtest ## Run tests.
 
 .PHONY: build
 build: generate fmt vet tidy ## Build manager binary.
-	go build -o bin/manager main.go
+	CGO_ENABLED=0 go build -o manager main.go
 
 .PHONY: run
 run: manifests generate fmt vet tidy ## Run a controller from your host.
@@ -88,7 +88,7 @@ api-docs: gen-crd-api-reference-docs
 	$(GEN_CRD_API_REFERENCE_DOCS) -api-dir=./api/v1beta1 -config=./hack/api-docs/config.json -template-dir=./hack/api-docs/template -out-file=./docs/api/v1beta1.md
 
 .PHONY: docker-build
-docker-build:
+docker-build: build
 	docker build -t ${IMG} .
 
 .PHONY: docker-push
@@ -117,6 +117,17 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+TEST_PROFILE=mongodb
+CLUSTER=kind
+
+.PHONY: kind-test
+kind-test: docker-build ## Deploy including test
+	kustomize build config/base/crd | kubectl --context kind-${CLUSTER} apply -f -	
+	kind load docker-image ${IMG} --name ${CLUSTER}
+	kustomize build config/tests/cases/${TEST_PROFILE} --enable-helm | kubectl --context kind-${CLUSTER} apply -f -	
+	kubectl --context kind-${CLUSTER} -n k8sdb-system delete pods -l app=k8sdb-controller
+	exec /bin/sh config/tests/cases/${TEST_PROFILE}/verify.sh
 
 CONTROLLER_GEN = $(GOBIN)/controller-gen
 .PHONY: controller-gen

@@ -44,7 +44,7 @@ type postgresqlContainer struct {
 
 func setupPostgreSQLContainer(ctx context.Context) (*postgresqlContainer, error) {
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:10",
+		Image:        "postgres:12",
 		ExposedPorts: []string{"5432/tcp"},
 		WaitingFor:   wait.ForListeningPort("5432"),
 		Env: map[string]string{
@@ -329,7 +329,7 @@ var _ = Describe("PostgreSQL", func() {
 				return len(got.Status.Conditions) == 1 &&
 					got.Status.Conditions[0].Reason == infrav1beta1.CredentialsNotFoundReason &&
 					got.Status.Conditions[0].Status == "False" &&
-					strings.Contains(got.Status.Conditions[0].Message, "Referencing secret was not found:") &&
+					strings.Contains(got.Status.Conditions[0].Message, "referencing secret was not found:") &&
 					got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
 			}, timeout, interval).Should(BeTrue())
@@ -420,7 +420,7 @@ var _ = Describe("PostgreSQL", func() {
 				return len(got.Status.Conditions) == 1 &&
 					got.Status.Conditions[0].Reason == infrav1beta1.CredentialsNotFoundReason &&
 					got.Status.Conditions[0].Status == "False" &&
-					strings.Contains(got.Status.Conditions[0].Message, "Credentials field not found in referenced secret:") &&
+					strings.Contains(got.Status.Conditions[0].Message, "credentials field not found in referenced secret:") &&
 					got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
 			}, timeout, interval).Should(BeTrue())

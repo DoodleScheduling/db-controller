@@ -333,7 +333,7 @@ var _ = Describe("MongoDB", func() {
 				return len(got.Status.Conditions) == 1 &&
 					got.Status.Conditions[0].Reason == infrav1beta1.CredentialsNotFoundReason &&
 					got.Status.Conditions[0].Status == "False" &&
-					strings.Contains(got.Status.Conditions[0].Message, "Referencing secret was not found:") &&
+					strings.Contains(got.Status.Conditions[0].Message, "referencing secret was not found:") &&
 					got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
 			}, timeout, interval).Should(BeTrue())
@@ -424,7 +424,7 @@ var _ = Describe("MongoDB", func() {
 				return len(got.Status.Conditions) == 1 &&
 					got.Status.Conditions[0].Reason == infrav1beta1.CredentialsNotFoundReason &&
 					got.Status.Conditions[0].Status == "False" &&
-					strings.Contains(got.Status.Conditions[0].Message, "Credentials field not found in referenced secret:") &&
+					strings.Contains(got.Status.Conditions[0].Message, "credentials field not found in referenced secret:") &&
 					got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
 			}, timeout, interval).Should(BeTrue())
