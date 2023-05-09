@@ -111,7 +111,7 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	db.SetDefaults()
+	_ = db.SetDefaults()
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if db.ObjectMeta.DeletionTimestamp.IsZero() {

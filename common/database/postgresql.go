@@ -35,14 +35,14 @@ func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*Post
 
 	q, _ := url.ParseQuery(popt.RawQuery)
 	hasConnectTimeout := false
-	for k, _ := range q {
+	for k := range q {
 		if k == "connect_timeout" {
 			hasConnectTimeout = true
 			break
 		}
 	}
 
-	if hasConnectTimeout == false {
+	if !hasConnectTimeout {
 		q.Add("connect_timeout", "2")
 	}
 

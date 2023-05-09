@@ -3,7 +3,7 @@ kind: PostgreSQLDatabase
 metadata:
   name: foo
 spec:
-  address: postgres://postgresql.postgresql:5432
+  address: postgres://postgresql.k8sdb-system:5432
   databaseName: foo
   extensions:
   - name: pg_trgm

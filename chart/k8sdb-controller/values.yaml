@@ -97,11 +97,6 @@ serviceAccount:
 clusterRBAC:
   enabled: true
 
-# Creates a PodSecurityPolicy and the role/rolebinding
-# allowing the serviceaccount to use it
-podSecurityPolicy:
-  enabled: false
-
 # Prometheus operator PodMonitor
 podMonitor:
   enabled: false
@@ -122,5 +117,8 @@ prometheusRule:
   #  namespace: monitoring
   labels: {}
   rules: []
+
+kubeRBACProxy:
+  enabled: true
 
 tolerations: []

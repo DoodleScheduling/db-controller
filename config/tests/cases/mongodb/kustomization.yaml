@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: k8sdb-system
+
+resources: 
+- ../../../default
+- foo-secret.yaml
+- root-secret.yaml
+- user.yaml
+- db.yaml
+
+helmCharts:
+- repo: https://charts.bitnami.com/bitnami
+  name: mongodb
+  version: 13.10.2
+  releaseName: mongodb
+  namespace: k8sdb-system
+  valuesInline:
+    persistence:
+      enabled: false
+    auth:
+      rootPassword: password
+
+images:
+- name: ghcr.io/doodlescheduling/k8sdb-controller
+  newTag: latest
+  newName: k8sdb-controller

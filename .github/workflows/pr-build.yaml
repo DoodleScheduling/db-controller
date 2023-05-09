@@ -1,0 +1,107 @@
+name: pr-build
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      profiles: ${{ steps.profiles.outputs.matrix }}    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b #v3
+      - name: Setup Go
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 #v3.5.0
+        with:
+          go-version: 1.20.x
+      - name: Restore Go cache
+        uses: actions/cache@4723a57e26efda3a62cbde1812113b730952852d #v3.2.2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: fmt
+        run: make fmt
+      - name: vet
+        run: make vet
+      - name: lint
+        run: make lint
+      - name: test
+        run: make test
+      - name: build
+        run: make build
+      - name: Send go coverage report
+        uses: shogo82148/actions-goveralls@31ee804b8576ae49f6dc3caa22591bc5080e7920 #v1.6.0
+        with:
+          path-to-profile: coverage.out
+      - name: Check if working tree is dirty
+        run: |
+          if [[ $(git diff --stat) != '' ]]; then
+            git --no-pager diff
+            echo 'run <make test> and commit changes'
+            exit 1
+          fi
+      - name: Build container image
+        run: |
+          make docker-build
+      - name: Create image tarball
+        run: |
+          docker save --output k8sdb-controller-container.tar k8sdb-controller:latest
+      - name: Upload image
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce #v3.1.2
+        with:
+          name: k8sdb-controller-container
+          path: k8sdb-controller-container.tar        
+      - id: profiles
+        name: Determine test profiles
+        run: |
+          profiles=$(ls config/tests/cases | jq -R -s -c 'split("\n")[:-1]')
+          echo $profiles
+          echo "::set-output name=matrix::$profiles"
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs:
+    - build
+    strategy:
+      matrix:
+        profile: ${{ fromJson(needs.build.outputs.profiles) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c #v3
+      - name: Setup Kubernetes
+        uses: engineerd/setup-kind@aa272fe2a7309878ffc2a81c56cfe3ef108ae7d0 #v0.5.0
+        with:
+          version: v0.17.0
+      - name: Download k8sdb-controller container
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a #v3.0.2
+        with:
+          name: k8sdb-controller-container
+          path: /tmp
+      - name: Load images
+        run: |
+          docker load --input /tmp/k8sdb-controller-container.tar
+          docker image ls -a
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@6691bdeb1b0a3286fb7f70fd1423c10e81e5375f # v2.0.0
+
+      - name: Run test
+        run: |
+          make kind-test TEST_PROFILE=${{ matrix.profile }}
+      - name: Debug failure
+        if: failure()
+        run: |
+          kubectl -n kube-system describe pods
+          kubectl -n k8sdb-system describe pods
+          kubectl -n k8sdb-system get all
+          kubectl -n k8sdb-system logs deploy/k8sdb-controller
+          kubectl -n k8sdb-system get postgresqlusers -o yaml
+          kubectl -n k8sdb-system get postgresqldatabases -o yaml
+          kubectl -n k8sdb-system get mongodbusers -o yaml
+          kubectl -n k8sdb-system get mongodbdatabases -o yaml
