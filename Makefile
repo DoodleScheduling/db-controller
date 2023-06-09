@@ -65,7 +65,7 @@ lint: golangci-lint ## Run golangci-lint against code
 
 .PHONY: test
 test: manifests generate fmt vet tidy envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -v -coverprofile coverage.out -race
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -v -coverprofile coverage.out -race 
 
 ##@ Build
 
