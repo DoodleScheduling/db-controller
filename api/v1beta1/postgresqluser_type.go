@@ -20,12 +20,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type Privilege string
+
+var SelectPrivilege Privilege = "SELECT"
+var AlPrivilege Privilege = "ALL"
+
 type PostgreSQLUserSpec struct {
 	// +required
 	Database *DatabaseReference `json:"database"`
 
 	// +required
 	Credentials *SecretReference `json:"credentials"`
+
+	// +kubebuilder:default:={{privileges: {ALL}, object: SCHEMA, objectName: public}}
+	Grants []Grant `json:"grants,omitempty"`
+
+	// Roles are postgres roles granted to this user
+	Roles []string `json:"roles,omitempty"`
+}
+
+type Grant struct {
+	Object     string      `json:"object,omitempty"`
+	ObjectName string      `json:"objectName,omitempty"`
+	User       string      `json:"user,omitempty"`
+	Privileges []Privilege `json:"privileges,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice

@@ -77,6 +77,31 @@ spec:
                 required:
                 - name
                 type: object
+              grants:
+                default:
+                - object: SCHEMA
+                  objectName: public
+                  privileges:
+                  - ALL
+                items:
+                  properties:
+                    object:
+                      type: string
+                    objectName:
+                      type: string
+                    privileges:
+                      items:
+                        type: string
+                      type: array
+                    user:
+                      type: string
+                  type: object
+                type: array
+              roles:
+                description: Roles are postgres roles granted to this user
+                items:
+                  type: string
+                type: array
             required:
             - credentials
             - database

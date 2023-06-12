@@ -235,7 +235,30 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw)
+	var grants []database.Grant
+	for _, grant := range user.Spec.Grants {
+		var privs []database.Privilege
+		for _, p := range grant.Privileges {
+			privs = append(privs, database.Privilege(p))
+		}
+
+		grants = append(grants, database.Grant{
+			Object:     grant.Object,
+			ObjectName: grant.ObjectName,
+			User:       grant.User,
+			Privileges: privs,
+		})
+	}
+
+	userSpec := database.PostgresqlUser{
+		Database: db.GetDatabaseName(),
+		Username: usr,
+		Password: pw,
+		Roles:    user.Spec.Roles,
+		Grants:   grants,
+	}
+
+	err = dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
 		err = fmt.Errorf("Failed to provison user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
@@ -263,15 +286,21 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 	//We can't easily drop a user from postgres since it ownes objects
 	//err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
 
+	userSpec := database.PostgresqlUser{
+		Database: db.GetDatabaseName(),
+		Username: user.Status.Username,
+		Password: generateToken(32),
+	}
+
 	//Instead privileges are revoked and the password gets randomized
-	err := dbHandler.SetupUser(ctx, db.GetDatabaseName(), user.Status.Username, generateToken(32))
+	err := dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
 		err = fmt.Errorf("Failed to update user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
 
-	err = dbHandler.RevokeAllPrivileges(ctx, db.GetDatabaseName(), user.Status.Username)
+	err = dbHandler.RevokeAllPrivileges(ctx, userSpec)
 
 	if err != nil {
 		err = fmt.Errorf("Failed to revoke privileges from user account: %w", err)
