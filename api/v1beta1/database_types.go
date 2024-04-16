@@ -15,6 +15,7 @@ const (
 	DatabaseReadyConditionType  = "DatabaseReady"
 	UserReadyConditionType      = "UserReady"
 	ExtensionReadyConditionType = "ExtensionReady"
+	SchemaReadyConditionType    = "SchemaReady"
 )
 
 // Status reasons
@@ -28,8 +29,11 @@ const (
 	UserProvisioningSuccessfulReason     = "UserProvisioningSuccessful"
 	CredentialsNotFoundReason            = "CredentialsNotFound"
 	CreateDatabaseFailedReason           = "CreateDatabaseFailed"
-	CreateExtensionFailedReason          = "CreateExtensionFailed"
+	CreateExtensionsFailedReason         = "CreateExtensionsFailed"
+	CreateSchemasFailedReason            = "CreateSchemasFailed"
 	ProgressingReason                    = "ProgressingReason"
+	CreateExtensionsSuccessfulReason     = "CreateExtensionsSuccessful"
+	CreateSchemasSuccessfulReason        = "CreateSchemasSuccessful"
 )
 
 // DatabaseSpec defines the desired state of a *Database

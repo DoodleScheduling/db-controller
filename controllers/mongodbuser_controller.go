@@ -192,7 +192,7 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 
 	err := r.Client.Get(ctx, databaseName, &db)
 	if err != nil {
-		err = fmt.Errorf("Referencing database was not found: %w", err)
+		err = fmt.Errorf("referencing database was not found: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
 		return user, err
 	}
@@ -236,7 +236,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
 	if err != nil {
-		err = fmt.Errorf("Failed to provision user account: %w", err)
+		err = fmt.Errorf("failed to provision user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
@@ -278,7 +278,7 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
 	if err != nil {
-		err = fmt.Errorf("Failed to provison user account: %w", err)
+		err = fmt.Errorf("failed to provison user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
@@ -291,7 +291,7 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 func (r *MongoDBUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase, userDropper userDropper) (infrav1beta1.MongoDBUser, error) {
 	err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
 	if err != nil {
-		err = fmt.Errorf("Failed to remove user account: %w", err)
+		err = fmt.Errorf("failed to remove user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}

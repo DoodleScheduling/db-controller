@@ -28,6 +28,14 @@ type Extension struct {
 // Extensions is a collection of Extension types
 type Extensions []Extension
 
+// Schema is a resource representing database schema
+type Schema struct {
+	Name string `json:"name"`
+}
+
+// Schemas is a collection of Schema types
+type Schemas []Schema
+
 // PostgreSQLDatabaseSpec defines the desired state of PostgreSQLDatabase
 type PostgreSQLDatabaseSpec struct {
 	*DatabaseSpec `json:",inline"`
@@ -35,6 +43,11 @@ type PostgreSQLDatabaseSpec struct {
 	// Database extensions
 	// +optional
 	Extensions Extensions `json:"extensions,omitempty"`
+
+	// Database schemas
+	// +kubebuilder:default:={{name: public}}
+	// +optional
+	Schemas Schemas `json:"schemas,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice
@@ -102,6 +115,18 @@ type PostgreSQLDatabaseList struct {
 
 func ExtensionNotReadyCondition(in conditionalResource, reason, message string) {
 	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionFalse, reason, message)
+}
+
+func SchemaNotReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, SchemaReadyConditionType, metav1.ConditionFalse, reason, message)
+}
+
+func ExtensionReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, ExtensionReadyConditionType, metav1.ConditionTrue, reason, message)
+}
+
+func SchemaReadyCondition(in conditionalResource, reason, message string) {
+	setResourceCondition(in, SchemaReadyConditionType, metav1.ConditionTrue, reason, message)
 }
 
 func (d *PostgreSQLDatabase) SetDefaults() error {

@@ -168,7 +168,7 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 
 	err = rootDBHandler.CreateDatabaseIfNotExists(ctx, db.GetDatabaseName())
 	if err != nil {
-		err = fmt.Errorf("Failed to provision database: %w", err)
+		err = fmt.Errorf("failed to provision database: %w", err)
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CreateDatabaseFailedReason, err.Error())
 		return db, err
 	}
@@ -184,11 +184,23 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 
 	for _, ext := range db.Spec.Extensions {
 		if err := dbHandler.EnableExtension(ctx, db.GetDatabaseName(), ext.Name); err != nil {
-			err = fmt.Errorf("Failed to create extension %s in database: %w", ext.Name, err)
-			infrav1beta1.ExtensionNotReadyCondition(&db, infrav1beta1.CreateExtensionFailedReason, err.Error())
+			err = fmt.Errorf("failed to create extension %s in database: %w", ext.Name, err)
+			infrav1beta1.ExtensionNotReadyCondition(&db, infrav1beta1.CreateExtensionsFailedReason, err.Error())
 			return db, err
 		}
 	}
+
+	infrav1beta1.ExtensionReadyCondition(&db, infrav1beta1.CreateExtensionsSuccessfulReason, "")
+
+	for _, schema := range db.Spec.Schemas {
+		if err := dbHandler.CreateSchema(ctx, db.GetDatabaseName(), schema.Name); err != nil {
+			err = fmt.Errorf("failed to create schemas %s in database: %w", schema.Name, err)
+			infrav1beta1.SchemaNotReadyCondition(&db, infrav1beta1.CreateSchemasFailedReason, err.Error())
+			return db, err
+		}
+	}
+
+	infrav1beta1.SchemaReadyCondition(&db, infrav1beta1.CreateSchemasSuccessfulReason, "")
 
 	return db, nil
 }

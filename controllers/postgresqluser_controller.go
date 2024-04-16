@@ -201,7 +201,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	err := r.Client.Get(ctx, databaseName, &db)
 	if err != nil {
-		err = fmt.Errorf("Referencing database was not found: %w", err)
+		err = fmt.Errorf("referencing database was not found: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
 		return user, err
 	}
@@ -260,7 +260,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	err = dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
-		err = fmt.Errorf("Failed to provison user account: %w", err)
+		err = fmt.Errorf("failed to provison user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
@@ -295,7 +295,7 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 	//Instead privileges are revoked and the password gets randomized
 	err := dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
-		err = fmt.Errorf("Failed to update user account: %w", err)
+		err = fmt.Errorf("failed to update user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
@@ -303,7 +303,7 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 	err = dbHandler.RevokeAllPrivileges(ctx, userSpec)
 
 	if err != nil {
-		err = fmt.Errorf("Failed to revoke privileges from user account: %w", err)
+		err = fmt.Errorf("failed to revoke privileges from user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}

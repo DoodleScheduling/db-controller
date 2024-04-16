@@ -143,6 +143,11 @@ func (s *PostgreSQLRepository) DropUser(ctx context.Context, user PostgresqlUser
 	return nil
 }
 
+func (s *PostgreSQLRepository) CreateSchema(ctx context.Context, db, name string) error {
+	_, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", (pgx.Identifier{name}).Sanitize()))
+	return err
+}
+
 func (s *PostgreSQLRepository) EnableExtension(ctx context.Context, db, name string) error {
 	if extensionExists, err := s.doesExtensionExist(ctx, db, name); err != nil {
 		return err
