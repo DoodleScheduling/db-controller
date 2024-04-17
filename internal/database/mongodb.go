@@ -104,7 +104,7 @@ func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, user
 func (m *MongoDBRepository) DropUser(ctx context.Context, database string, username string) error {
 	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
 	r := m.runCommand(ctx, database, command)
-	if _, err := r.DecodeBytes(); err != nil {
+	if _, err := r.Raw(); err != nil {
 		return err
 	}
 	return nil
@@ -168,7 +168,7 @@ func (m *MongoDBRepository) createUser(ctx context.Context, database string, use
 	command := &bson.D{primitive.E{Key: "createUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)
-	if _, err := r.DecodeBytes(); err != nil {
+	if _, err := r.Raw(); err != nil {
 		return err
 	}
 	return nil
@@ -178,7 +178,7 @@ func (m *MongoDBRepository) updateUserPasswordAndRoles(ctx context.Context, data
 	command := &bson.D{primitive.E{Key: "updateUser", Value: username}, primitive.E{Key: "pwd", Value: password},
 		primitive.E{Key: "roles", Value: m.getRoles(database, roles)}}
 	r := m.runCommand(ctx, database, command)
-	if _, err := r.DecodeBytes(); err != nil {
+	if _, err := r.Raw(); err != nil {
 		return err
 	}
 	return nil
