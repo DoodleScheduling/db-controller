@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/go-logr/logr v1.2.4
 	github.com/jackc/pgx/v4 v4.18.2
-	github.com/mongodb-forks/digest v1.0.4
+	github.com/mongodb-forks/digest v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.6
 	github.com/spf13/pflag v1.0.5
