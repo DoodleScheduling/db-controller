@@ -1,8 +1,8 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= k8sdb-controller:latest
+IMG ?= db-controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.23
+ENVTEST_K8S_VERSION = 1.27
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -42,7 +42,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/base/crd/bases
-	cp config/base/crd/bases/* chart/k8sdb-controller/crds/
+	cp config/base/crd/bases/* chart/db-controller/crds/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -112,7 +112,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/base/manager && $(KUSTOMIZE) edit set image ghcr.io/doodlescheduling/k8sdb-controller=${IMG}
+	cd config/base/manager && $(KUSTOMIZE) edit set image ghcr.io/doodlescheduling/db-controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 .PHONY: undeploy
@@ -127,8 +127,8 @@ kind-test: docker-build ## Deploy including test
 	kustomize build config/base/crd | kubectl --context kind-${CLUSTER} apply -f -	
 	kind load docker-image ${IMG} --name ${CLUSTER}
 	kustomize build config/tests/cases/${TEST_PROFILE} --enable-helm | kubectl --context kind-${CLUSTER} apply -f -	
-	kubectl --context kind-${CLUSTER} -n k8sdb-system delete pods -l app=k8sdb-controller
-	exec /bin/sh config/tests/cases/${TEST_PROFILE}/verify.sh
+	kubectl --context kind-${CLUSTER} -n db-system delete pods -l app=db-controller
+	exec /bin/sh config/tests/cases/${TEST_PROFILE}/verify.sh ${CLUSTER}
 
 CONTROLLER_GEN = $(GOBIN)/controller-gen
 .PHONY: controller-gen

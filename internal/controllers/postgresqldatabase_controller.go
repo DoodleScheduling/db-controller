@@ -31,11 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
+	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
+	"github.com/doodlescheduling/db-controller/internal/stringutils"
 )
 
 // +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqldatabases,verbs=get;list;watch;create;update;patch;delete
@@ -67,20 +65,19 @@ func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxCon
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.PostgreSQLDatabase{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+func (r *PostgreSQLDatabaseReconciler) requestsForSecretChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*corev1.Secret)
 	if !ok {
 		panic(fmt.Sprintf("expected a Secret, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.PostgreSQLDatabaseList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		secretIndexKey: objectKey(s).String(),
@@ -115,8 +112,8 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !stringutils.ContainsString(db.GetFinalizers(), v1beta1.Finalizer) {
-			controllerutil.AddFinalizer(&db, v1beta1.Finalizer)
+		if !stringutils.ContainsString(db.GetFinalizers(), infrav1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&db, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &db); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -206,8 +203,8 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 }
 
 func (r *PostgreSQLDatabaseReconciler) finalizeDatabase(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
-	if stringutils.ContainsString(db.ObjectMeta.Finalizers, v1beta1.Finalizer) {
-		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, v1beta1.Finalizer)
+	if stringutils.ContainsString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
+		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &db); err != nil {
 			return db, err
 		}

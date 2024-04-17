@@ -31,11 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
+	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
+	"github.com/doodlescheduling/db-controller/internal/stringutils"
 )
 
 // +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbdatabases,verbs=get;list;watch;create;update;patch;delete
@@ -67,20 +65,19 @@ func (r *MongoDBDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcur
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.MongoDBDatabase{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *MongoDBDatabaseReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+func (r *MongoDBDatabaseReconciler) requestsForSecretChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*corev1.Secret)
 	if !ok {
 		panic(fmt.Sprintf("expected a Secret, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.MongoDBDatabaseList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		secretIndexKey: objectKey(s).String(),
@@ -115,8 +112,8 @@ func (r *MongoDBDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !stringutils.ContainsString(db.GetFinalizers(), v1beta1.Finalizer) {
-			controllerutil.AddFinalizer(&db, v1beta1.Finalizer)
+		if !stringutils.ContainsString(db.GetFinalizers(), infrav1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&db, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &db); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -186,8 +183,8 @@ func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, 
 }
 
 func (r *MongoDBDatabaseReconciler) finalizeDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
-	if stringutils.ContainsString(db.ObjectMeta.Finalizers, v1beta1.Finalizer) {
-		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, v1beta1.Finalizer)
+	if stringutils.ContainsString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
+		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &db); err != nil {
 			return db, err
 		}

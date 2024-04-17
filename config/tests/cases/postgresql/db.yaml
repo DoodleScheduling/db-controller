@@ -3,10 +3,13 @@ kind: PostgreSQLDatabase
 metadata:
   name: foo
 spec:
-  address: postgres://postgresql.k8sdb-system:5432
+  address: postgres://postgresql.db-system:5432
   databaseName: foo
   extensions:
   - name: pg_trgm
+  schemas:
+  - name: public
+  - name: another_schema
   rootSecret:
     name: postgresql-root
     passwordField: password

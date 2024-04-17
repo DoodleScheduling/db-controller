@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/database"
+	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
+	"github.com/doodlescheduling/db-controller/internal/database"
 )
 
 // Index keys

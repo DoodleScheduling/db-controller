@@ -32,11 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
+	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
+	"github.com/doodlescheduling/db-controller/internal/stringutils"
 )
 
 // +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=mongodbusers,verbs=get;list;watch;create;update;patch;delete
@@ -80,24 +78,23 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.MongoDBUser{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
 		).
 		Watches(
-			&source.Kind{Type: &infrav1beta1.MongoDBDatabase{}},
+			&infrav1beta1.MongoDBDatabase{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForDatabaseChange),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+func (r *MongoDBUserReconciler) requestsForSecretChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*corev1.Secret)
 	if !ok {
 		panic(fmt.Sprintf("expected a Secret, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.MongoDBUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		credentialsIndexKey: objectKey(s).String(),
@@ -114,13 +111,12 @@ func (r *MongoDBUserReconciler) requestsForSecretChange(o client.Object) []recon
 	return reqs
 }
 
-func (r *MongoDBUserReconciler) requestsForDatabaseChange(o client.Object) []reconcile.Request {
+func (r *MongoDBUserReconciler) requestsForDatabaseChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*infrav1beta1.MongoDBDatabase)
 	if !ok {
 		panic(fmt.Sprintf("expected a MongoDBDatabase, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.MongoDBUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		dbIndexKey: objectKey(s).String(),
@@ -152,8 +148,8 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if user.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !stringutils.ContainsString(user.GetFinalizers(), v1beta1.Finalizer) {
-			controllerutil.AddFinalizer(&user, v1beta1.Finalizer)
+		if !stringutils.ContainsString(user.GetFinalizers(), infrav1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&user, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &user); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -296,8 +292,8 @@ func (r *MongoDBUserReconciler) finalizeUser(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	if stringutils.ContainsString(user.ObjectMeta.Finalizers, v1beta1.Finalizer) {
-		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, v1beta1.Finalizer)
+	if stringutils.ContainsString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
+		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &user); err != nil {
 			return user, err
 		}

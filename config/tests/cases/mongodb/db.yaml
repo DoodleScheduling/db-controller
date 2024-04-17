@@ -3,7 +3,7 @@ kind: MongoDBDatabase
 metadata:
   name: admin
 spec:
-  address: mongodb://mongodb.k8sdb-system:27017
+  address: mongodb://mongodb.db-system:27017
   databaseName: admin
   rootSecret:
     name: mongodb-root

@@ -34,12 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	infrav1beta1 "github.com/doodlescheduling/k8sdb-controller/api/v1beta1"
-	"github.com/doodlescheduling/k8sdb-controller/common/database"
-	"github.com/doodlescheduling/k8sdb-controller/common/stringutils"
+	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
+	"github.com/doodlescheduling/db-controller/internal/database"
+	"github.com/doodlescheduling/db-controller/internal/stringutils"
 )
 
 // +kubebuilder:rbac:groups=dbprovisioning.infra.doodle.com,resources=postgresqlusers,verbs=get;list;watch;create;update;patch;delete
@@ -83,24 +81,23 @@ func (r *PostgreSQLUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurr
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrav1beta1.PostgreSQLUser{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
 		).
 		Watches(
-			&source.Kind{Type: &infrav1beta1.PostgreSQLDatabase{}},
+			&infrav1beta1.PostgreSQLDatabase{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForDatabaseChange),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *PostgreSQLUserReconciler) requestsForSecretChange(o client.Object) []reconcile.Request {
+func (r *PostgreSQLUserReconciler) requestsForSecretChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*corev1.Secret)
 	if !ok {
 		panic(fmt.Sprintf("expected a Secret, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.PostgreSQLUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		credentialsIndexKey: objectKey(s).String(),
@@ -117,13 +114,12 @@ func (r *PostgreSQLUserReconciler) requestsForSecretChange(o client.Object) []re
 	return reqs
 }
 
-func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(o client.Object) []reconcile.Request {
+func (r *PostgreSQLUserReconciler) requestsForDatabaseChange(ctx context.Context, o client.Object) []reconcile.Request {
 	s, ok := o.(*infrav1beta1.PostgreSQLDatabase)
 	if !ok {
 		panic(fmt.Sprintf("expected a PostgreSQLDatabase, got %T", o))
 	}
 
-	ctx := context.Background()
 	var list infrav1beta1.PostgreSQLUserList
 	if err := r.List(ctx, &list, client.MatchingFields{
 		dbIndexKey: objectKey(s).String(),
@@ -161,8 +157,8 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if user.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !stringutils.ContainsString(user.GetFinalizers(), v1beta1.Finalizer) {
-			controllerutil.AddFinalizer(&user, v1beta1.Finalizer)
+		if !stringutils.ContainsString(user.GetFinalizers(), infrav1beta1.Finalizer) {
+			controllerutil.AddFinalizer(&user, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &user); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -308,8 +304,8 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 		return user, err
 	}
 
-	if stringutils.ContainsString(user.ObjectMeta.Finalizers, v1beta1.Finalizer) {
-		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, v1beta1.Finalizer)
+	if stringutils.ContainsString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
+		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &user); err != nil {
 			return user, err
 		}

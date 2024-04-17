@@ -1,4 +1,4 @@
-project_name: k8sdb-controller
+project_name: db-controller
 
 builds:
 - id: manager
@@ -47,7 +47,7 @@ dockers:
   - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
   - --label=org.opencontainers.image.revision={{ .FullCommit }}
   - --label=org.opencontainers.image.licenses=Apache-2.0
-- image_templates:
+- image_templates: 
   - ghcr.io/doodlescheduling/{{ .ProjectName }}:v{{ .Version }}-arm64v8
   goarch: arm64
   dockerfile: Dockerfile
@@ -90,12 +90,12 @@ signs:
   output: true
 
 docker_signs:
-- cmd: cosign
-  env:
-  - COSIGN_EXPERIMENTAL=1
-  artifacts: all
-  output: true
-  args:
-  - 'sign'
-  - '${artifact}'
-  - --yes
+  - cmd: cosign
+    env:
+    - COSIGN_EXPERIMENTAL=1
+    artifacts: all
+    output: true
+    args:
+    - 'sign'
+    - '${artifact}'
+    - --yes

@@ -2,12 +2,12 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: {{ include "k8sdb-controller.fullname" . }}
+  name: {{ include "db-controller.fullname" . }}
   labels:
-    app.kubernetes.io/name: {{ include "k8sdb-controller.name" . }}
+    app.kubernetes.io/name: {{ include "db-controller.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    helm.sh/chart: {{ include "k8sdb-controller.chart" . }}
+    helm.sh/chart: {{ include "db-controller.chart" . }}
     {{- range $key, $value := .Values.podMonitor.additionalLabels }}
     {{ $key }}: {{ $value | quote }}
     {{- end }}
@@ -24,7 +24,7 @@ spec:
     scheme: https
     bearerTokenSecret:
       key: token
-      name: {{ template "k8sdb-controller.serviceAccountName" . }}
+      name: {{ template "db-controller.serviceAccountName" . }}
     tlsConfig:
       insecureSkipVerify: true
     {{- else }}
@@ -40,7 +40,7 @@ spec:
     - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "k8sdb-controller.name" . }}
+      app.kubernetes.io/name: {{ include "db-controller.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.podMonitor.targetLabels }}
   targetLabels:
