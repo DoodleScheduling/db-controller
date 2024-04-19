@@ -1,5 +1,5 @@
 domain: doodle.com
-repo: github.com/doodlescheduling/k8sdb-controller
+repo: github.com/doodlescheduling/db-controller
 resources:
 - group: dbprovisioning.infra.doodle.com
   kind: MongoDBDatabase

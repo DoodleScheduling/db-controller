@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: k8sdb-controller
+  name: db-controller
   labels:
     control-plane: controller
 spec:
   selector:
     matchLabels:
-      app: k8sdb-controller
+      app: db-controller
   replicas: 1
   template:
     metadata:
       labels:
-        app: k8sdb-controller
+        app: db-controller
     spec:
       containers:
       - command:
         - /manager
-        image: ghcr.io/doodlescheduling/k8sdb-controller:latest
+        image: ghcr.io/doodlescheduling/db-controller:latest
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
