@@ -13,6 +13,6 @@ jobs:
         with:
           egress-policy: audit    
       - name: size-label
-        uses: "pascalgn/size-label-action@1619680c5ac1ef360b944bb56a57587ba4aa2af8"
+        uses: "pascalgn/size-label-action@49850f3557d4b77f0b2e759829defd77ccc07c54"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
