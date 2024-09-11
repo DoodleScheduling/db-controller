@@ -1,11 +1,13 @@
 module github.com/doodlescheduling/db-controller
 
-go 1.20
+go 1.21
+
+toolchain go1.23.1
 
 require (
 	github.com/fluxcd/pkg/runtime v0.42.0
 	github.com/go-logr/logr v1.4.1
-	github.com/jackc/pgx/v4 v4.18.1
+	github.com/jackc/pgx/v4 v4.18.2
 	github.com/mongodb-forks/digest v1.1.0
 	github.com/onsi/ginkgo/v2 v2.16.0
 	github.com/onsi/gomega v1.31.1
