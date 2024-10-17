@@ -13,9 +13,9 @@ require (
 	github.com/testcontainers/testcontainers-go v0.30.0
 	go.mongodb.org/atlas v0.36.0
 	go.mongodb.org/mongo-driver v1.16.1
-	k8s.io/api v0.31.0
-	k8s.io/apimachinery v0.31.0
-	k8s.io/client-go v0.31.0
+	k8s.io/api v0.31.1
+	k8s.io/apimachinery v0.31.1
+	k8s.io/client-go v0.31.1
 	sigs.k8s.io/controller-runtime v0.19.0
 )
 
