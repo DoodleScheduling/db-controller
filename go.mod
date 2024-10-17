@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.34.2
 	github.com/spf13/pflag v1.0.5
 	github.com/testcontainers/testcontainers-go v0.30.0
-	go.mongodb.org/atlas v0.36.0
+	go.mongodb.org/atlas v0.37.0
 	go.mongodb.org/mongo-driver v1.16.1
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1
