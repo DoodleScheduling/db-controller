@@ -44,6 +44,10 @@ type PostgreSQLDatabaseSpec struct {
 	// +optional
 	Extensions Extensions `json:"extensions,omitempty"`
 
+	// Search path
+	// +optional
+	SearchPath Schemas `json:"searchPath,omitempty"`
+
 	// Database schemas
 	// +kubebuilder:default:={{name: public}}
 	// +optional

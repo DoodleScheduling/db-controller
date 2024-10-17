@@ -3,6 +3,7 @@
 [![release](https://img.shields.io/github/release/DoodleScheduling/db-controller/all.svg)](https://github.com/DoodleScheduling/db-controller/releases)
 [![release](https://github.com/doodlescheduling/db-controller/actions/workflows/release.yaml/badge.svg)](https://github.com/doodlescheduling/db-controller/actions/workflows/release.yaml)
 [![report](https://goreportcard.com/badge/github.com/DoodleScheduling/db-controller)](https://goreportcard.com/report/github.com/DoodleScheduling/db-controller)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/DoodleScheduling/growthbook-controller/badge)](https://api.securityscorecards.dev/projects/github.com/DoodleScheduling/growthbook-controller)
 [![Coverage Status](https://coveralls.io/repos/github/DoodleScheduling/db-controller/badge.svg?branch=master)](https://coveralls.io/github/DoodleScheduling/db-controller?branch=master)
 [![license](https://img.shields.io/github/license/DoodleScheduling/db-controller.svg)](https://github.com/DoodleScheduling/db-controller/blob/master/LICENSE)
 

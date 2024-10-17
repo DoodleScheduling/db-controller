@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 )
 
 type PostgreSQLOptions struct {
@@ -32,21 +33,6 @@ func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*Post
 	}
 
 	popt.User = url.UserPassword(opts.Username, opts.Password)
-
-	q, _ := url.ParseQuery(popt.RawQuery)
-	hasConnectTimeout := false
-	for k := range q {
-		if k == "connect_timeout" {
-			hasConnectTimeout = true
-			break
-		}
-	}
-
-	if !hasConnectTimeout {
-		q.Add("connect_timeout", "2")
-	}
-
-	popt.RawQuery = q.Encode()
 
 	if opts.DatabaseName != "" {
 		popt.Path = opts.DatabaseName
@@ -145,6 +131,16 @@ func (s *PostgreSQLRepository) DropUser(ctx context.Context, user PostgresqlUser
 
 func (s *PostgreSQLRepository) CreateSchema(ctx context.Context, db, name string) error {
 	_, err := s.conn.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", (pgx.Identifier{name}).Sanitize()))
+	return err
+}
+
+func (s *PostgreSQLRepository) SetSearchPath(ctx context.Context, db string, searchPath []string) error {
+	var path []string
+	for _, v := range searchPath {
+		path = append(path, (pgx.Identifier{v}).Sanitize())
+	}
+
+	_, err := s.conn.Exec(ctx, fmt.Sprintf("ALTER DATABASE %s SET search_path TO %s;", (pgx.Identifier{db}).Sanitize(), strings.Join(path, ",")))
 	return err
 }
 

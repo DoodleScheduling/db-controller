@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"errors"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -45,8 +44,6 @@ type MongoDBRepository struct {
 
 func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRepository, error) {
 	o := options.Client()
-	o.SetConnectTimeout(time.Duration(3) * time.Second)
-	o.SetServerSelectionTimeout(time.Duration(3) * time.Second)
 	o.ApplyURI(opts.URI)
 
 	o.SetAuth(options.Credential{

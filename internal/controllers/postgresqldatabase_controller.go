@@ -26,10 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
@@ -63,7 +65,9 @@ func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxCon
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.PostgreSQLDatabase{}).
+		For(&infrav1beta1.PostgreSQLDatabase{}, builder.WithPredicates(
+			predicate.GenerationChangedPredicate{},
+		)).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
@@ -120,13 +124,19 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	db, err := r.reconcile(ctx, db)
+	reconcileContext := ctx
+	if db.Spec.Timeout != nil {
+		c, cancel := context.WithTimeout(ctx, db.Spec.Timeout.Duration)
+		defer cancel()
+		reconcileContext = c
+	}
+
+	db, reconcileErr := r.reconcile(reconcileContext, db)
 	res := ctrl.Result{}
 	db.Status.ObservedGeneration = db.GetGeneration()
 
-	if err != nil {
-		r.Recorder.Event(&db, "Normal", "error", err.Error())
-		res = ctrl.Result{Requeue: true}
+	if reconcileErr != nil {
+		r.Recorder.Event(&db, "Normal", "error", reconcileErr.Error())
 	} else {
 		msg := "Database successfully provisioned"
 		r.Recorder.Event(&db, "Normal", "info", msg)
@@ -136,10 +146,10 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &db); err != nil {
 		logger.Error(err, "unable to update status after reconciliation")
-		return ctrl.Result{Requeue: true}, err
+		return res, err
 	}
 
-	return res, nil
+	return res, reconcileErr
 }
 
 func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
@@ -198,6 +208,20 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 	}
 
 	infrav1beta1.SchemaReadyCondition(&db, infrav1beta1.CreateSchemasSuccessfulReason, "")
+
+	var searchPath []string
+	for _, schema := range db.Spec.SearchPath {
+		searchPath = append(searchPath, schema.Name)
+	}
+
+	if len(searchPath) == 0 {
+		searchPath = []string{"public"}
+	}
+
+	if err := dbHandler.SetSearchPath(ctx, db.GetDatabaseName(), searchPath); err != nil {
+		err = fmt.Errorf("failed to set search path %v in database: %w", searchPath, err)
+		return db, err
+	}
 
 	return db, nil
 }

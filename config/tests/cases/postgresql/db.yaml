@@ -10,6 +10,8 @@ spec:
   schemas:
   - name: public
   - name: another_schema
+  searchPath:
+  - name: another_schema
   rootSecret:
     name: postgresql-root
     passwordField: password

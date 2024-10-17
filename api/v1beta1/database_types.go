@@ -38,6 +38,10 @@ const (
 
 // DatabaseSpec defines the desired state of a *Database
 type DatabaseSpec struct {
+	// Timeout reconciling the database and referenced resources
+	// +optional
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
 	// DatabaseName is by default the same as metata.name
 	// +optional
 	DatabaseName string `json:"databaseName"`
