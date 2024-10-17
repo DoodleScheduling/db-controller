@@ -1,16 +1,43 @@
 domain: doodle.com
+layout:
+- go.kubebuilder.io/v3
+projectName: db-controller
 repo: github.com/doodlescheduling/db-controller
 resources:
-- group: dbprovisioning.infra.doodle.com
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: doodle.com
+  group: dbprovisioning.infra.doodle.com
   kind: MongoDBDatabase
+  path: github.com/doodlescheduling/db-controller/api/v1beta1
   version: v1beta1
-- group: dbprovisioning.infra.doodle.com
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: doodle.com
+  group: dbprovisioning.infra.doodle.com
   kind: PostgreSQLDatabase
+  path: github.com/doodlescheduling/db-controller/api/v1beta1
   version: v1beta1
-- group: dbprovisioning.infra.doodle.com
-  kind: MongoDBUser
-  version: v1beta1
-- group: dbprovisioning.infra.doodle.com
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: doodle.com
+  group: dbprovisioning.infra.doodle.com
   kind: PostgreSQLUser
+  path: github.com/doodlescheduling/db-controller/api/v1beta1
   version: v1beta1
-version: "2"
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: doodle.com
+  group: dbprovisioning.infra.doodle.com
+  kind: MongoDBUser
+  path: github.com/doodlescheduling/db-controller/api/v1beta1
+  version: v1beta1
+version: "3"

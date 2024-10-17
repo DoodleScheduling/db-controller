@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
@@ -76,7 +78,9 @@ func (r *MongoDBUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrent
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.MongoDBUser{}).
+		For(&infrav1beta1.MongoDBUser{}, builder.WithPredicates(
+			predicate.GenerationChangedPredicate{},
+		)).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
@@ -156,13 +160,12 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	user, err := r.reconcile(ctx, user)
+	user, reconcileErr := r.reconcile(ctx, user)
 	res := ctrl.Result{}
 	user.Status.ObservedGeneration = user.GetGeneration()
 
-	if err != nil {
-		r.Recorder.Event(&user, "Normal", "error", err.Error())
-		res = ctrl.Result{Requeue: true}
+	if reconcileErr != nil {
+		r.Recorder.Event(&user, "Normal", "error", reconcileErr.Error())
 	} else {
 		msg := "User successfully provisioned"
 		r.Recorder.Event(&user, "Normal", "info", msg)
@@ -172,10 +175,10 @@ func (r *MongoDBUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
 		logger.Error(err, "unable to update status after reconciliation")
-		return ctrl.Result{Requeue: true}, err
+		return res, err
 	}
 
-	return res, nil
+	return res, reconcileErr
 }
 
 func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1.MongoDBUser) (infrav1beta1.MongoDBUser, error) {
@@ -193,6 +196,12 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 		return user, err
 	}
 
+	if db.Spec.Timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, db.Spec.Timeout.Duration)
+		defer cancel()
+	}
+
 	if db.Spec.AtlasGroupId != "" {
 		return r.reconcileAtlasUser(ctx, user, db)
 	}
@@ -202,14 +211,22 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 
 func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
-	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	rootUsr, rootPw, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
 	}
 
-	dbHandler, err := setupMongoDB(ctx, db, usr, pw)
+	// Fetch referencing secret
+	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return user, err
+	}
+
+	dbHandler, err := setupMongoDB(ctx, db, rootUsr, rootPw)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
@@ -220,14 +237,6 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 
 	if !user.ObjectMeta.DeletionTimestamp.IsZero() {
 		return r.finalizeUser(ctx, user, db, dbHandler)
-	}
-
-	// Fetch referencing secret
-	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
-
-	if err != nil {
-		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return user, err
 	}
 
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
@@ -251,6 +260,14 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 		return user, err
 	}
 
+	// Fetch referencing secret
+	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return user, err
+	}
+
 	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey)
 
 	if err != nil {
@@ -264,17 +281,9 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 		return r.finalizeUser(ctx, user, db, dbHandler)
 	}
 
-	// Fetch referencing secret
-	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
-
-	if err != nil {
-		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return user, err
-	}
-
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
 	if err != nil {
-		err = fmt.Errorf("failed to provison user account: %w", err)
+		err = fmt.Errorf("failed to provision user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}

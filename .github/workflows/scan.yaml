@@ -8,42 +8,26 @@ on:
   schedule:
     - cron: '18 10 * * 3'
 
-permissions:
-  contents: read # for actions/checkout to fetch code
-  security-events: write # for codeQL to write security events
+permissions: {}
 
 jobs:
-  fossa:
-    name: FOSSA
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@1b05615854632b887b69ae1be8cbefe72d3ae423 # v2.6.0
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
-      - name: Run FOSSA scan and upload build data
-        uses: fossa-contrib/fossa-action@6728dc6fe9a068c648d080c33829ffbe56565023 # v2.0.0
-        with:
-          # FOSSA Push-Only API Token
-          fossa-api-key: 956b9b92c5b16eeca1467cebe104f2c3
-          github-token: ${{ github.token }}
-
   codeql:
-    name: CodeQL
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for codeQL to write security events
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@1b05615854632b887b69ae1be8cbefe72d3ae423 # v2.6.0
+        uses: step-security/harden-runner@5c7944e73c4c2a096b17a9cb74d65b6c2bbafbde # v2.9.1
         with:
           egress-policy: audit
       - name: Checkout repository
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@dc046388f30eacf938aadd32064285f437bd9c04 #codeql-bundle-20221020
+        uses: github/codeql-action/init@f0a12816612c7306b485a22cb164feb43c6df818 # codeql-bundle-20221020
         with:
           languages: go
       - name: Autobuild
-        uses: github/codeql-action/autobuild@dc046388f30eacf938aadd32064285f437bd9c04 #codeql-bundle-20221020
+        uses: github/codeql-action/autobuild@f0a12816612c7306b485a22cb164feb43c6df818 # codeql-bundle-20221020
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@dc046388f30eacf938aadd32064285f437bd9c04 #codeql-bundle-20221020
+        uses: github/codeql-action/analyze@f0a12816612c7306b485a22cb164feb43c6df818 # codeql-bundle-20221020

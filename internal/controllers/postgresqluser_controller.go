@@ -29,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	infrav1beta1 "github.com/doodlescheduling/db-controller/api/v1beta1"
@@ -79,7 +81,9 @@ func (r *PostgreSQLUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurr
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1beta1.PostgreSQLUser{}).
+		For(&infrav1beta1.PostgreSQLUser{}, builder.WithPredicates(
+			predicate.GenerationChangedPredicate{},
+		)).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForSecretChange),
@@ -140,13 +144,6 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger := r.Log.WithValues("PostgreSQLUser", req.NamespacedName)
 	logger.Info("reconciling PostgreSQLUser")
 
-	// common controller functions
-	//cw := NewControllerWrapper(*r, &ctx)
-
-	// garbage collector
-	//gc := NewPostgreSQLGarbageCollector(r, cw, &logger)
-
-	// get database resource by namespaced name
 	var user infrav1beta1.PostgreSQLUser
 	if err := r.Get(ctx, req.NamespacedName, &user); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -165,13 +162,12 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	user, err := r.reconcile(ctx, user)
+	user, reconcileErr := r.reconcile(ctx, user)
 	res := ctrl.Result{}
 	user.Status.ObservedGeneration = user.GetGeneration()
 
-	if err != nil {
-		r.Recorder.Event(&user, "Normal", "error", err.Error())
-		res = ctrl.Result{Requeue: true}
+	if reconcileErr != nil {
+		r.Recorder.Event(&user, "Normal", "error", reconcileErr.Error())
 	} else {
 		msg := "User successfully provisioned"
 		r.Recorder.Event(&user, "Normal", "info", msg)
@@ -181,10 +177,10 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Update status after reconciliation.
 	if err := r.patchStatus(ctx, &user); err != nil {
 		logger.Error(err, "unable to update status after reconciliation")
-		return ctrl.Result{Requeue: true}, err
+		return res, err
 	}
 
-	return res, nil
+	return res, reconcileErr
 }
 
 func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser) (infrav1beta1.PostgreSQLUser, error) {
@@ -202,15 +198,29 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	// Fetch referencing root secret
-	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	if db.Spec.Timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, db.Spec.Timeout.Duration)
+		defer cancel()
+	}
+
+	// Fetch referencing secret
+	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
 	}
 
-	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw, true)
+	// Fetch referencing root secret
+	rootUsr, rootPw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+
+	if err != nil {
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
+		return user, err
+	}
+
+	dbHandler, err := setupPostgreSQL(ctx, db, rootUsr, rootPw, true)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
@@ -221,14 +231,6 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	if !user.ObjectMeta.DeletionTimestamp.IsZero() {
 		return r.finalizeUser(ctx, user, db, dbHandler)
-	}
-
-	// Fetch referencing secret
-	usr, pw, err = getSecret(ctx, r.Client, user.GetCredentials())
-
-	if err != nil {
-		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return user, err
 	}
 
 	var grants []database.Grant
@@ -256,7 +258,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	err = dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
-		err = fmt.Errorf("failed to provison user account: %w", err)
+		err = fmt.Errorf("failed to provision user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
 	}
@@ -279,8 +281,8 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 		return user, nil
 	}
 
-	//We can't easily drop a user from postgres since it ownes objects
-	//err := userDropper.DropUser(ctx, db.GetDatabaseName(), user.Status.Username)
+	//We can't easily drop a user from postgres since it owns objects
+	//Instead privileges are revoked and the password gets randomized
 
 	userSpec := database.PostgresqlUser{
 		Database: db.GetDatabaseName(),
@@ -288,7 +290,6 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 		Password: generateToken(32),
 	}
 
-	//Instead privileges are revoked and the password gets randomized
 	err := dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
 		err = fmt.Errorf("failed to update user account: %w", err)

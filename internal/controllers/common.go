@@ -77,7 +77,7 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 }
 
 func setupAtlas(ctx context.Context, db infrav1beta1.MongoDBDatabase, pubKey, privKey string) (*database.AtlasRepository, error) {
-	handler, err := database.NewAtlasRepository(context.TODO(), database.AtlasOptions{
+	handler, err := database.NewAtlasRepository(ctx, database.AtlasOptions{
 		GroupID:    db.Spec.AtlasGroupId,
 		PrivateKey: privKey,
 		PublicKey:  pubKey,
@@ -101,7 +101,7 @@ func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, us
 		opts.DatabaseName = db.GetDatabaseName()
 	}
 
-	handler, err := database.NewPostgreSQLRepository(context.TODO(), opts)
+	handler, err := database.NewPostgreSQLRepository(ctx, opts)
 
 	if err != nil {
 		return handler, fmt.Errorf("failed to setup connection to postgres server: %w", err)
@@ -111,7 +111,7 @@ func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, us
 }
 
 func setupMongoDB(ctx context.Context, db infrav1beta1.MongoDBDatabase, usr, pw string) (*database.MongoDBRepository, error) {
-	handler, err := database.NewMongoDBRepository(context.TODO(), database.MongoDBOptions{
+	handler, err := database.NewMongoDBRepository(ctx, database.MongoDBOptions{
 		URI:              db.Spec.Address,
 		AuthDatabaseName: db.GetRootDatabaseName(),
 		DatabaseName:     db.GetDatabaseName(),

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -83,7 +83,7 @@ var _ = Describe("PostgreSQL", func() {
 				err       error
 			)
 
-			container, err = setupPostgreSQLContainer(context.TODO(), image)
+			container, err = setupPostgreSQLContainer(context.Background(), image)
 			Expect(err).NotTo(HaveOccurred(), "failed to start postgres container")
 
 			Describe("fails if database not found", Ordered, func() {
@@ -152,6 +152,9 @@ var _ = Describe("PostgreSQL", func() {
 						},
 						Spec: infrav1beta1.PostgreSQLDatabaseSpec{
 							DatabaseSpec: &infrav1beta1.DatabaseSpec{
+								Timeout: &metav1.Duration{
+									Duration: time.Millisecond * 100,
+								},
 								RootSecret: &infrav1beta1.SecretReference{
 									Name: "does-not-exist",
 								},
@@ -197,7 +200,7 @@ var _ = Describe("PostgreSQL", func() {
 				})
 			})
 
-			Describe("fails if datatabase root secret not found", Ordered, func() {
+			Describe("fails if user secret is not found", Ordered, func() {
 				var (
 					createdDB   *infrav1beta1.PostgreSQLDatabase
 					createdUser *infrav1beta1.PostgreSQLUser
@@ -219,7 +222,10 @@ var _ = Describe("PostgreSQL", func() {
 						},
 						Spec: infrav1beta1.PostgreSQLDatabaseSpec{
 							DatabaseSpec: &infrav1beta1.DatabaseSpec{
-								Address: "postgres://does-not-exist:27017",
+								Timeout: &metav1.Duration{
+									Duration: time.Millisecond * 100,
+								},
+								Address: "postgres://does-not-exist:5432",
 								RootSecret: &infrav1beta1.SecretReference{
 									Name: rootSecret.Name,
 								},
@@ -251,81 +257,104 @@ var _ = Describe("PostgreSQL", func() {
 					Expect(k8sClient.Create(context.Background(), createdUser)).Should(Succeed())
 				})
 
-				It("expecs reconcile to fail because database is not reachable", func() {
-					got := &infrav1beta1.PostgreSQLUser{}
-					Eventually(func() bool {
-						_ = k8sClient.Get(context.Background(), keyUser, got)
-						return len(got.Status.Conditions) == 1 &&
-							got.Status.Conditions[0].Reason == infrav1beta1.ConnectionFailedReason &&
-							got.Status.Conditions[0].Status == "False" &&
-							got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
-
-					}, timeout, interval).Should(BeTrue())
-				})
-			})
-
-			Describe("fails if user secret not found", Ordered, func() {
-				var (
-					createdDB   *infrav1beta1.PostgreSQLDatabase
-					createdUser *infrav1beta1.PostgreSQLUser
-					keyUser     types.NamespacedName
-					keyDB       types.NamespacedName
-				)
-
-				namespace, rootSecret := setupNamespace()
-
-				It("adds database", func() {
-					keyDB = types.NamespacedName{
-						Name:      "postgresdatabase-" + randStringRunes(5),
-						Namespace: namespace.Name,
-					}
-					createdDB = &infrav1beta1.PostgreSQLDatabase{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      keyDB.Name,
-							Namespace: keyDB.Namespace,
-						},
-						Spec: infrav1beta1.PostgreSQLDatabaseSpec{
-							DatabaseSpec: &infrav1beta1.DatabaseSpec{
-								Address: container.URI,
-								RootSecret: &infrav1beta1.SecretReference{
-									Name: rootSecret.Name,
-								},
-							},
-						},
-					}
-					Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
-				})
-
-				It("adds user", func() {
-					keyUser = types.NamespacedName{
-						Name:      "postgresuser-" + randStringRunes(5),
-						Namespace: namespace.Name,
-					}
-					createdUser = &infrav1beta1.PostgreSQLUser{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      keyUser.Name,
-							Namespace: keyUser.Namespace,
-						},
-						Spec: infrav1beta1.PostgreSQLUserSpec{
-							Database: &infrav1beta1.DatabaseReference{
-								Name: keyDB.Name,
-							},
-							Credentials: &infrav1beta1.SecretReference{
-								Name: "does-not-exist",
-							},
-						},
-					}
-					Expect(k8sClient.Create(context.Background(), createdUser)).Should(Succeed())
-				})
-
-				It("fails reconcile because user credentials are not found", func() {
+				It("expects reconcile to fail because the user secret is not found", func() {
 					got := &infrav1beta1.PostgreSQLUser{}
 					Eventually(func() bool {
 						_ = k8sClient.Get(context.Background(), keyUser, got)
 						return len(got.Status.Conditions) == 1 &&
 							got.Status.Conditions[0].Reason == infrav1beta1.CredentialsNotFoundReason &&
 							got.Status.Conditions[0].Status == "False" &&
-							strings.Contains(got.Status.Conditions[0].Message, "referencing secret was not found:") &&
+							got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
+
+					}, timeout, interval).Should(BeTrue())
+				})
+			})
+			Describe("fails if database can't be reached", Ordered, func() {
+				var (
+					createdDB     *infrav1beta1.PostgreSQLDatabase
+					createdUser   *infrav1beta1.PostgreSQLUser
+					keyUser       types.NamespacedName
+					keyDB         types.NamespacedName
+					keySecret     types.NamespacedName
+					password      string
+					createdSecret *corev1.Secret
+				)
+
+				namespace, rootSecret := setupNamespace()
+
+				It("adds database", func() {
+					keyDB = types.NamespacedName{
+						Name:      "postgresdatabase-" + randStringRunes(5),
+						Namespace: namespace.Name,
+					}
+					createdDB = &infrav1beta1.PostgreSQLDatabase{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      keyDB.Name,
+							Namespace: keyDB.Namespace,
+						},
+						Spec: infrav1beta1.PostgreSQLDatabaseSpec{
+							DatabaseSpec: &infrav1beta1.DatabaseSpec{
+								Timeout: &metav1.Duration{
+									Duration: time.Millisecond * 100,
+								},
+								Address: "postgres://does-not-exist:5432",
+								RootSecret: &infrav1beta1.SecretReference{
+									Name: rootSecret.Name,
+								},
+							},
+						},
+					}
+					Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
+				})
+
+				It("adds secret", func() {
+					keySecret = types.NamespacedName{
+						Name:      "secret-" + randStringRunes(5),
+						Namespace: namespace.Name,
+					}
+					password = randStringRunes(5)
+					createdSecret = &corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      keySecret.Name,
+							Namespace: keySecret.Namespace,
+						},
+						Data: map[string][]byte{
+							"username": []byte(keyUser.Name),
+							"password": []byte(password),
+						},
+					}
+					Expect(k8sClient.Create(context.Background(), createdSecret)).Should(Succeed())
+				})
+
+				It("adds user", func() {
+					keyUser = types.NamespacedName{
+						Name:      "postgresuser-" + randStringRunes(5),
+						Namespace: namespace.Name,
+					}
+					createdUser = &infrav1beta1.PostgreSQLUser{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      keyUser.Name,
+							Namespace: keyUser.Namespace,
+						},
+						Spec: infrav1beta1.PostgreSQLUserSpec{
+							Database: &infrav1beta1.DatabaseReference{
+								Name: keyDB.Name,
+							},
+							Credentials: &infrav1beta1.SecretReference{
+								Name: keySecret.Name,
+							},
+						},
+					}
+					Expect(k8sClient.Create(context.Background(), createdUser)).Should(Succeed())
+				})
+
+				It("fails reconcile because database can't be reached", func() {
+					got := &infrav1beta1.PostgreSQLUser{}
+					Eventually(func() bool {
+						_ = k8sClient.Get(context.Background(), keyUser, got)
+						return len(got.Status.Conditions) == 1 &&
+							got.Status.Conditions[0].Reason == infrav1beta1.ConnectionFailedReason &&
+							got.Status.Conditions[0].Status == "False" &&
 							got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
 					}, timeout, interval).Should(BeTrue())
@@ -357,6 +386,9 @@ var _ = Describe("PostgreSQL", func() {
 						},
 						Spec: infrav1beta1.PostgreSQLDatabaseSpec{
 							DatabaseSpec: &infrav1beta1.DatabaseSpec{
+								Timeout: &metav1.Duration{
+									Duration: time.Millisecond * 100,
+								},
 								Address: container.URI,
 								RootSecret: &infrav1beta1.SecretReference{
 									Name: rootSecret.Name,
@@ -437,10 +469,6 @@ var _ = Describe("PostgreSQL", func() {
 				namespace, rootSecret := setupNamespace()
 
 				Describe("creates readWrite user if it does not exists", Ordered, func() {
-					var (
-						client *pgxpool.Pool
-					)
-
 					It("adds database", func() {
 						keyDB = types.NamespacedName{
 							Name:      "postgresdatabase-" + randStringRunes(5),
@@ -453,6 +481,9 @@ var _ = Describe("PostgreSQL", func() {
 							},
 							Spec: infrav1beta1.PostgreSQLDatabaseSpec{
 								DatabaseSpec: &infrav1beta1.DatabaseSpec{
+									Timeout: &metav1.Duration{
+										Duration: time.Millisecond * 100,
+									},
 									Address: container.URI,
 									RootSecret: &infrav1beta1.SecretReference{
 										Name: rootSecret.Name,
@@ -464,15 +495,30 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(k8sClient.Create(context.Background(), createdDB)).Should(Succeed())
 					})
 
-					It("adds user", func() {
-						keySecret = types.NamespacedName{
-							Name:      "secret-" + randStringRunes(5),
-							Namespace: namespace.Name,
-						}
+					It("adds secret", func() {
 						keyUser = types.NamespacedName{
 							Name:      "postgresuser-" + randStringRunes(5),
 							Namespace: namespace.Name,
 						}
+						keySecret = types.NamespacedName{
+							Name:      "secret-" + randStringRunes(5),
+							Namespace: namespace.Name,
+						}
+						password = randStringRunes(5)
+						createdSecret = &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      keySecret.Name,
+								Namespace: keySecret.Namespace,
+							},
+							Data: map[string][]byte{
+								"username": []byte(keyUser.Name),
+								"password": []byte(password),
+							},
+						}
+						Expect(k8sClient.Create(context.Background(), createdSecret)).Should(Succeed())
+					})
+
+					It("adds user", func() {
 						createdUser = &infrav1beta1.PostgreSQLUser{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      keyUser.Name,
@@ -488,21 +534,6 @@ var _ = Describe("PostgreSQL", func() {
 							},
 						}
 						Expect(k8sClient.Create(context.Background(), createdUser)).Should(Succeed())
-					})
-
-					It("adds secret", func() {
-						password = randStringRunes(5)
-						createdSecret = &corev1.Secret{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      keySecret.Name,
-								Namespace: keySecret.Namespace,
-							},
-							Data: map[string][]byte{
-								"username": []byte(keyUser.Name),
-								"password": []byte(password),
-							},
-						}
-						Expect(k8sClient.Create(context.Background(), createdSecret)).Should(Succeed())
 					})
 
 					It("expects ready user", func() {
@@ -529,14 +560,15 @@ var _ = Describe("PostgreSQL", func() {
 
 						Expect(err).NotTo(HaveOccurred(), "failed to connect to postgresql")
 
+						var client *pgx.Conn
+
 						Eventually(func() error {
-							client, err = pgxpool.Connect(ctx, popt.String())
+							c, err := pgx.Connect(ctx, popt.String())
+							client = c
 							return err
 						}, timeout, interval).Should(Succeed())
-					})
 
-					It("has write access to the referenced role database", func() {
-						_, err := client.Exec(ctx, fmt.Sprintln("CREATE TABLE foo (key integer);"))
+						_, err = client.Exec(ctx, fmt.Sprintln("CREATE TABLE foo (key integer);"))
 						Expect(err).NotTo(HaveOccurred(), "failed to insert doc")
 					})
 
@@ -553,7 +585,7 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(err).NotTo(HaveOccurred(), "failed to connect to postgresql")
 
 						Eventually(func() error {
-							client, err = pgxpool.Connect(ctx, popt.String())
+							_, err := pgx.Connect(ctx, popt.String())
 							return err
 						}, timeout, interval).ShouldNot(Succeed())
 					})
@@ -571,7 +603,7 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(err).NotTo(HaveOccurred(), "failed to connect to postgresql")
 
 						Eventually(func() error {
-							_, err = pgxpool.Connect(ctx, popt.String())
+							_, err := pgx.Connect(ctx, popt.String())
 							return err
 						}, timeout, interval).ShouldNot(Succeed())
 					})
@@ -612,7 +644,7 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(err).NotTo(HaveOccurred(), "failed to connect to postgresql")
 
 						Eventually(func() error {
-							_, err = pgxpool.Connect(ctx, popt.String())
+							_, err := pgx.Connect(ctx, popt.String())
 							return err
 						}, timeout, interval).Should(Succeed())
 					})
@@ -643,7 +675,7 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(err).NotTo(HaveOccurred(), "failed to connect to postgresql")
 
 						Eventually(func() error {
-							_, err = pgxpool.Connect(ctx, popt.String())
+							_, err := pgx.Connect(ctx, popt.String())
 							return err
 						}, timeout, interval).ShouldNot(Succeed())
 					})

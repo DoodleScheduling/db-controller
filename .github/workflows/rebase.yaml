@@ -6,20 +6,25 @@ on:
   issue_comment:
     types: [created]
 
+permissions: {}
+
 jobs:
   rebase:
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/rebase') && (github.event.comment.author_association == 'CONTRIBUTOR' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed to force push
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@1b05615854632b887b69ae1be8cbefe72d3ae423 # v2.6.0
+        uses: step-security/harden-runner@5c7944e73c4c2a096b17a9cb74d65b6c2bbafbde # v2.9.1
         with:
-          egress-policy: audit    
+          egress-policy: audit
+
       - name: Checkout the latest code
-        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b #v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
         with:
           fetch-depth: 0
       - name: Automatic Rebase
-        uses: cirrus-actions/rebase@b87d48154a87a85666003575337e27b8cd65f691 #1.8
+        uses: cirrus-actions/rebase@b87d48154a87a85666003575337e27b8cd65f691 # 1.8
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
