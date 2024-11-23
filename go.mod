@@ -14,7 +14,7 @@ require (
 	go.mongodb.org/atlas v0.37.0
 	go.mongodb.org/mongo-driver v1.17.1
 	k8s.io/api v0.31.2
-	k8s.io/apimachinery v0.31.2
+	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.2
 	sigs.k8s.io/controller-runtime v0.19.1
 )
