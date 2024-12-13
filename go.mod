@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/mongodb-forks/digest v1.1.0
 	github.com/onsi/ginkgo/v2 v2.22.0
-	github.com/onsi/gomega v1.36.0
+	github.com/onsi/gomega v1.36.1
 	github.com/spf13/pflag v1.0.5
 	github.com/testcontainers/testcontainers-go v0.34.0
 	go.mongodb.org/atlas v0.37.0
