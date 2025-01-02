@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/mongodb-forks/digest v1.1.0
-	github.com/onsi/ginkgo/v2 v2.22.1
+	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/spf13/pflag v1.0.5
 	github.com/testcontainers/testcontainers-go v0.34.0
