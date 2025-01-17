@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/spf13/pflag v1.0.5
-	github.com/testcontainers/testcontainers-go v0.34.0
+	github.com/testcontainers/testcontainers-go v0.35.0
 	go.mongodb.org/atlas v0.37.0
 	go.mongodb.org/mongo-driver v1.17.2
 	k8s.io/api v0.31.3
