@@ -9,7 +9,7 @@ require (
 	github.com/mongodb-forks/digest v1.1.0
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/testcontainers/testcontainers-go v0.35.0
 	go.mongodb.org/atlas v0.37.0
 	go.mongodb.org/mongo-driver v1.17.2
