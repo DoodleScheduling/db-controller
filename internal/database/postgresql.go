@@ -32,6 +32,10 @@ func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*Post
 		return nil, err
 	}
 
+	if popt.Scheme == "" {
+		popt.Scheme = "postgres://"
+	}
+
 	popt.User = url.UserPassword(opts.Username, opts.Password)
 
 	if opts.DatabaseName != "" {

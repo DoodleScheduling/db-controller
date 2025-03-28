@@ -79,6 +79,10 @@ type SecretReference struct {
 	// +optional
 	// +kubebuilder:default:=password
 	PasswordField string `json:"passwordField"`
+
+	// +optional
+	// +kubebuilder:default:=address
+	AddressField string `json:"addressField"`
 }
 
 // conditionalResource is a resource with conditions
