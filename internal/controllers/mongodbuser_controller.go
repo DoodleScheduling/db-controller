@@ -211,7 +211,7 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 
 func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
-	rootUsr, rootPw, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	rootUsr, rootPw, _, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
@@ -253,7 +253,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 
 func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
-	pubKey, privKey, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	pubKey, privKey, _, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
