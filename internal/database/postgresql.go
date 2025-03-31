@@ -27,7 +27,12 @@ const (
 )
 
 func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*PostgreSQLRepository, error) {
-	popt, err := url.Parse(opts.URI)
+	uri := opts.URI
+	if !strings.HasPrefix(uri, "postgresql://") && !strings.HasPrefix(uri, "postgres://") {
+		uri = "postgresql://" + uri
+	}
+
+	popt, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}

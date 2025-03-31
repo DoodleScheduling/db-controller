@@ -63,6 +63,9 @@ spec:
                 description: Contains a credentials set of a user with enough permission
                   to manage databases and user accounts
                 properties:
+                  addressField:
+                    default: address
+                    type: string
                   name:
                     description: Name referrs to the name of the secret, must be located
                       whithin the same namespace

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -44,7 +45,13 @@ type MongoDBRepository struct {
 
 func NewMongoDBRepository(ctx context.Context, opts MongoDBOptions) (*MongoDBRepository, error) {
 	o := options.Client()
-	o.ApplyURI(opts.URI)
+
+	uri := opts.URI
+	if !strings.HasPrefix(uri, "mongodb://") {
+		uri = "mongodb://" + uri
+	}
+
+	o.ApplyURI(uri)
 
 	o.SetAuth(options.Credential{
 		Username: opts.Username,

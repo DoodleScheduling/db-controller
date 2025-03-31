@@ -205,7 +205,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	}
 
 	// Fetch referencing secret
-	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
+	usr, pw, _, err := getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
@@ -213,14 +213,14 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	}
 
 	// Fetch referencing root secret
-	rootUsr, rootPw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	rootUsr, rootPw, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
 	}
 
-	dbHandler, err := setupPostgreSQL(ctx, db, rootUsr, rootPw, true)
+	dbHandler, err := setupPostgreSQL(ctx, db, rootUsr, rootPw, addr, true)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())

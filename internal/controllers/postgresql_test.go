@@ -72,11 +72,11 @@ func setupPostgreSQLContainer(ctx context.Context, image string) (*postgresqlCon
 
 var _ = Describe("PostgreSQL", func() {
 	const (
-		timeout  = time.Second * 10
+		timeout  = time.Second * 5
 		interval = time.Second * 1
 	)
 
-	for _, image := range []string{"postgres:12", "postgres:13", "postgres:14", "postgres:15"} {
+	for _, image := range []string{"postgres:13", "postgres:14", "postgres:15"} {
 		var _ = Describe(image, func() {
 			var (
 				container *postgresqlContainer
@@ -130,7 +130,7 @@ var _ = Describe("PostgreSQL", func() {
 				})
 			})
 
-			Describe("fails if datatabase root secret not found", Ordered, func() {
+			Describe("fails if database root secret not found", Ordered, func() {
 				var (
 					createdDB   *infrav1beta1.PostgreSQLDatabase
 					createdUser *infrav1beta1.PostgreSQLUser

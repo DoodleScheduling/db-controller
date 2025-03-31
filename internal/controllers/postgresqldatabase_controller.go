@@ -153,14 +153,14 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
-	usr, pw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	usr, pw, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return db, err
 	}
 
-	rootDBHandler, err := setupPostgreSQL(ctx, db, usr, pw, false)
+	rootDBHandler, err := setupPostgreSQL(ctx, db, usr, pw, addr, false)
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())
@@ -180,7 +180,7 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 		return db, err
 	}
 
-	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw, true)
+	dbHandler, err := setupPostgreSQL(ctx, db, usr, pw, addr, true)
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())

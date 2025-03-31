@@ -11,7 +11,7 @@ builds:
 archives:
 - id: manager
   name_template: "manager_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-  builds:
+  ids:
   - manager
 
 checksum:
