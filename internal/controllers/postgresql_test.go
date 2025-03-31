@@ -72,11 +72,11 @@ func setupPostgreSQLContainer(ctx context.Context, image string) (*postgresqlCon
 
 var _ = Describe("PostgreSQL", func() {
 	const (
-		timeout  = time.Second * 10
+		timeout  = time.Second * 5
 		interval = time.Second * 1
 	)
 
-	for _, image := range []string{"postgres:15"} {
+	for _, image := range []string{"postgres:13", "postgres:14", "postgres:15"} {
 		var _ = Describe(image, func() {
 			var (
 				container *postgresqlContainer
@@ -470,7 +470,6 @@ var _ = Describe("PostgreSQL", func() {
 
 				Describe("creates readWrite user if it does not exists", Ordered, func() {
 					It("adds database", func() {
-						fmt.Println(container.URI)
 						keyDB = types.NamespacedName{
 							Name:      "postgresdatabase-" + randStringRunes(5),
 							Namespace: namespace.Name,

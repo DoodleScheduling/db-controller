@@ -27,13 +27,14 @@ const (
 )
 
 func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*PostgreSQLRepository, error) {
-	popt, err := url.Parse(opts.URI)
-	if err != nil {
-		return nil, err
+	uri := opts.URI
+	if !strings.HasPrefix(uri, "postgresql://") {
+		uri = "postgresql://" + uri
 	}
 
-	if popt.Scheme == "" {
-		popt.Scheme = "postgres://"
+	popt, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
 	}
 
 	popt.User = url.UserPassword(opts.Username, opts.Password)

@@ -13,7 +13,6 @@ limitations under the License.
 */
 package controllers
 
-/*
 import (
 	"context"
 	"fmt"
@@ -750,4 +749,3 @@ var _ = Describe("MongoDB", func() {
 		})
 	}
 })
-*/

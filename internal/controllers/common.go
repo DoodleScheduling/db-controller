@@ -80,7 +80,7 @@ func extractCredentials(credentials *infrav1beta1.SecretReference, secret *corev
 	}
 
 	if val, ok := secret.Data[addrField]; ok {
-		pw = string(val)
+		addr = string(val)
 	}
 
 	return user, pw, addr, nil
@@ -108,7 +108,7 @@ func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, us
 	}
 
 	if db.Spec.Address != "" {
-		opts.URI = addr
+		opts.URI = db.Spec.Address
 	}
 
 	if switchDB {
@@ -126,7 +126,7 @@ func setupPostgreSQL(ctx context.Context, db infrav1beta1.PostgreSQLDatabase, us
 
 func setupMongoDB(ctx context.Context, db infrav1beta1.MongoDBDatabase, usr, pw, addr string) (*database.MongoDBRepository, error) {
 	opts := database.MongoDBOptions{
-		URI:              db.Spec.Address,
+		URI:              addr,
 		AuthDatabaseName: db.GetRootDatabaseName(),
 		DatabaseName:     db.GetDatabaseName(),
 		Username:         usr,
@@ -134,7 +134,7 @@ func setupMongoDB(ctx context.Context, db infrav1beta1.MongoDBDatabase, usr, pw,
 	}
 
 	if db.Spec.Address != "" {
-		opts.URI = addr
+		opts.URI = db.Spec.Address
 	}
 
 	handler, err := database.NewMongoDBRepository(ctx, opts)
