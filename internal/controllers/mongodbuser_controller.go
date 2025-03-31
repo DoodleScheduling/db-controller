@@ -211,7 +211,7 @@ func (r *MongoDBUserReconciler) reconcile(ctx context.Context, user infrav1beta1
 
 func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
-	rootUsr, rootPw, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	rootUsr, rootPw, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
@@ -219,14 +219,14 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 	}
 
 	// Fetch referencing secret
-	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
+	usr, pw, addr, err := getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
 	}
 
-	dbHandler, err := setupMongoDB(ctx, db, rootUsr, rootPw)
+	dbHandler, err := setupMongoDB(ctx, db, rootUsr, rootPw, addr)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
@@ -253,7 +253,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 
 func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user infrav1beta1.MongoDBUser, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBUser, error) {
 	// Fetch referencing root secret
-	pubKey, privKey, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	pubKey, privKey, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
@@ -261,14 +261,14 @@ func (r *MongoDBUserReconciler) reconcileAtlasUser(ctx context.Context, user inf
 	}
 
 	// Fetch referencing secret
-	usr, pw, err := getSecret(ctx, r.Client, user.GetCredentials())
+	usr, pw, addr, err := getSecret(ctx, r.Client, user.GetCredentials())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return user, err
 	}
 
-	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey)
+	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey, addr)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())

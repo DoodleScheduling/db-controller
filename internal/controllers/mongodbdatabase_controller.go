@@ -169,14 +169,14 @@ func (r *MongoDBDatabaseReconciler) reconcileGenericDatabase(ctx context.Context
 }
 
 func (r *MongoDBDatabaseReconciler) reconcileAtlasDatabase(ctx context.Context, db infrav1beta1.MongoDBDatabase) (infrav1beta1.MongoDBDatabase, error) {
-	pubKey, privKey, err := getSecret(ctx, r.Client, db.GetRootSecret())
+	pubKey, privKey, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.CredentialsNotFoundReason, err.Error())
 		return db, err
 	}
 
-	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey)
+	dbHandler, err := setupAtlas(ctx, db, pubKey, privKey, addr)
 
 	if err != nil {
 		infrav1beta1.DatabaseNotReadyCondition(&db, infrav1beta1.ConnectionFailedReason, err.Error())

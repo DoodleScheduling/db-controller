@@ -54,6 +54,9 @@ spec:
                 description: SecretReference is a named reference to a secret which
                   contains user credentials
                 properties:
+                  addressField:
+                    default: address
+                    type: string
                   name:
                     description: Name referrs to the name of the secret, must be located
                       whithin the same namespace
