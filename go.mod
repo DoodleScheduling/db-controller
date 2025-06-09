@@ -12,7 +12,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/testcontainers/testcontainers-go v0.35.0
 	go.mongodb.org/atlas v0.38.0
-	go.mongodb.org/mongo-driver v1.17.3
+	go.mongodb.org/mongo-driver/v2 v2.2.2
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.4
 	k8s.io/client-go v0.31.3
