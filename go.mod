@@ -3,7 +3,7 @@ module github.com/doodlescheduling/db-controller
 go 1.22.0
 
 require (
-	github.com/fluxcd/pkg/runtime v0.49.1
+	github.com/fluxcd/pkg/runtime v0.61.0
 	github.com/go-logr/logr v1.4.2
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/mongodb-forks/digest v1.1.0
