@@ -37,6 +37,9 @@ type PostgreSQLUserSpec struct {
 
 	// Roles are postgres roles granted to this user
 	Roles []string `json:"roles,omitempty"`
+
+	// Attributes are postgres attributes associated with this user
+	Attributes []string `json:"attributes,omitempty"`
 }
 
 type Grant struct {

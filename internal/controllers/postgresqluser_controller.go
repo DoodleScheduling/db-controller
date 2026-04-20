@@ -249,11 +249,12 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	}
 
 	userSpec := database.PostgresqlUser{
-		Database: db.GetDatabaseName(),
-		Username: usr,
-		Password: pw,
-		Roles:    user.Spec.Roles,
-		Grants:   grants,
+		Database:   db.GetDatabaseName(),
+		Username:   usr,
+		Password:   pw,
+		Roles:      user.Spec.Roles,
+		Grants:     grants,
+		Attributes: user.Spec.Attributes,
 	}
 
 	err = dbHandler.SetupUser(ctx, userSpec)

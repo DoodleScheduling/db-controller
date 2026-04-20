@@ -133,12 +133,12 @@ kind-test: docker-build ## Deploy including test
 CONTROLLER_GEN = $(GOBIN)/controller-gen
 .PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.1)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.20.0)
 
 GOLANGCI_LINT = $(GOBIN)/golangci-lint
 .PHONY: golangci-lint
 golangci-lint: ## Download golint locally if necessary
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.0)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.2)
 
 KUSTOMIZE = $(GOBIN)/kustomize
 .PHONY: kustomize
@@ -148,7 +148,7 @@ kustomize: ## Download kustomize locally if necessary.
 ENVTEST = $(GOBIN)/setup-envtest
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.17)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22)
 
 # go-install-tool will 'go install' any package $2 and install it to $1
 define go-install-tool

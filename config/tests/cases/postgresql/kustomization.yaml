@@ -12,10 +12,13 @@ resources:
 helmCharts:
 - repo: https://charts.bitnami.com/bitnami
   name: postgresql
-  version: 12.4.2
+  version: 16.2.5
   releaseName: postgresql
   namespace: db-system
   valuesInline:
+    image:
+      repository: bitnamilegacy/postgresql
+      tag: 17.6.0-debian-12-r4
     auth:
       postgresPassword: password
     primary:

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -90,11 +91,12 @@ func (s *PostgreSQLRepository) CreateDatabaseIfNotExists(ctx context.Context, da
 }
 
 type PostgresqlUser struct {
-	Database string
-	Username string
-	Password string
-	Roles    []string
-	Grants   []Grant
+	Database   string
+	Username   string
+	Password   string
+	Roles      []string
+	Grants     []Grant
+	Attributes []string
 }
 
 type Grant struct {
@@ -119,12 +121,16 @@ func (s *PostgreSQLRepository) SetupUser(ctx context.Context, user PostgresqlUse
 	if err := s.grantAllPrivileges(ctx, user); err != nil {
 		return fmt.Errorf("failed to grant all privileges: %w", err)
 	}
-	if err := s.grantRoles(ctx, user); err != nil {
-		return fmt.Errorf("failed to grant roles: %w", err)
+	if err := s.setRoles(ctx, user); err != nil {
+		return fmt.Errorf("failed to set roles: %w", err)
 	}
 	if err := s.grantRules(ctx, user); err != nil {
 		return fmt.Errorf("failed to apply grant rules: %w", err)
 	}
+	if err := s.setAttributes(ctx, user); err != nil {
+		return fmt.Errorf("failed to set attributes: %w", err)
+	}
+
 	return nil
 }
 
@@ -228,7 +234,7 @@ func (s *PostgreSQLRepository) grantAllPrivileges(ctx context.Context, user Post
 	return err
 }
 
-func (s *PostgreSQLRepository) grantRoles(ctx context.Context, user PostgresqlUser) error {
+func (s *PostgreSQLRepository) setRoles(ctx context.Context, user PostgresqlUser) error {
 	for _, role := range user.Roles {
 		_, err := s.conn.Exec(ctx, fmt.Sprintf("GRANT %s TO %s;", (pgx.Identifier{role}).Sanitize(), (pgx.Identifier{user.Username}).Sanitize()))
 		if err != nil {
@@ -248,6 +254,38 @@ func (s *PostgreSQLRepository) grantRules(ctx context.Context, user PostgresqlUs
 			}
 		}
 
+	}
+
+	return nil
+}
+
+var validRoleAttributes = []string{
+	"LOGIN",
+	"NOLOGIN",
+	"SUPERUSER",
+	"NOSUPERUSER",
+	"CREATEDB",
+	"NOCREATEDB",
+	"CREATEROLE",
+	"NOCREATEROLE",
+	"REPLICATION",
+	"NOREPLICATION",
+	"BYPASSRLS",
+	"NOBYPASSRLS",
+	"INHERIT",
+	"NOINHERIT",
+}
+
+func (s *PostgreSQLRepository) setAttributes(ctx context.Context, user PostgresqlUser) error {
+	for _, attribute := range user.Attributes {
+		if !slices.Contains(validRoleAttributes, attribute) {
+			return fmt.Errorf("invalid role attribute %q", attribute)
+		}
+
+		_, err := s.conn.Exec(ctx, fmt.Sprintf("ALTER ROLE %s WITH %s;", (pgx.Identifier{user.Username}).Sanitize(), attribute))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -9,3 +9,5 @@ spec:
     userField: username
   database:
     name: foo
+  attributes:
+  - REPLICATION
