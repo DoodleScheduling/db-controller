@@ -60,7 +60,7 @@ func NewPostgreSQLRepository(ctx context.Context, opts PostgreSQLOptions) (*Post
 
 func (s *PostgreSQLRepository) Close(ctx context.Context) error {
 	if s.conn != nil {
-		s.conn.Close(ctx)
+		return s.conn.Close(ctx)
 	}
 
 	return nil

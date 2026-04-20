@@ -91,7 +91,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("MongoDBDatabase"),
+		Recorder: k8sManager.GetEventRecorder("MongoDBDatabase"),
 	}).SetupWithManager(k8sManager, 1)
 
 	Expect(err).ToNot(HaveOccurred(), "failed to setup MongoDBDatabase")
@@ -101,7 +101,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBUser"),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("MongoDBUser"),
+		Recorder: k8sManager.GetEventRecorder("MongoDBUser"),
 	}).SetupWithManager(k8sManager, 1)
 	Expect(err).ToNot(HaveOccurred(), "failed to setup MongoDBUser")
 
@@ -110,7 +110,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("PostgreSQLDatabase"),
+		Recorder: k8sManager.GetEventRecorder("PostgreSQLDatabase"),
 	}).SetupWithManager(k8sManager, 1)
 	Expect(err).ToNot(HaveOccurred(), "failed to setup PostgreSQLDatabase")
 
@@ -119,7 +119,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLUser"),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("PostgreSQLUser"),
+		Recorder: k8sManager.GetEventRecorder("PostgreSQLUser"),
 	}).SetupWithManager(k8sManager, 1)
 	Expect(err).ToNot(HaveOccurred(), "failed to setup PostgreSQLUser")
 

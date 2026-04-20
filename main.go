@@ -152,7 +152,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBDatabase"),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("MongoDBDatabase"),
+		Recorder: mgr.GetEventRecorder("MongoDBDatabase"),
 	}).SetupWithManager(mgr, concurrent); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBDatabase")
 		os.Exit(1)
@@ -163,7 +163,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("MongoDBUser"),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("MongoDBUser"),
+		Recorder: mgr.GetEventRecorder("MongoDBUser"),
 	}).SetupWithManager(mgr, concurrent); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDBUser")
 		os.Exit(1)
@@ -174,7 +174,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLDatabase"),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("PostgreSQLDatabase"),
+		Recorder: mgr.GetEventRecorder("PostgreSQLDatabase"),
 	}).SetupWithManager(mgr, concurrent); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLDatabase")
 		os.Exit(1)
@@ -185,7 +185,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("PostgreSQLUser"),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("PostgreSQLUser"),
+		Recorder: mgr.GetEventRecorder("PostgreSQLUser"),
 	}).SetupWithManager(mgr, concurrent); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PostgreSQLUser")
 		os.Exit(1)

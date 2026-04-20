@@ -613,7 +613,7 @@ var _ = Describe("PostgreSQL", func() {
 					It("changes password in referenced user secret", func() {
 						password = randStringRunes(5)
 						createdSecret.Data = map[string][]byte{
-							"username": []byte(createdUser.ObjectMeta.Name),
+							"username": []byte(createdUser.Name),
 							"password": []byte(password),
 						}
 						Expect(k8sClient.Update(context.Background(), createdSecret)).Should(Succeed())
