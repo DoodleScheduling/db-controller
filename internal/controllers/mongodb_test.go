@@ -28,7 +28,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -364,7 +363,7 @@ var _ = Describe("MongoDB", func() {
 					createdUser   *infrav1beta1.MongoDBUser
 					keyUser       types.NamespacedName
 					keyDB         types.NamespacedName
-					createdSecret *v1.Secret
+					createdSecret *corev1.Secret
 					keySecret     types.NamespacedName
 					password      string
 				)
@@ -406,7 +405,7 @@ var _ = Describe("MongoDB", func() {
 						Namespace: namespace.Name,
 					}
 					password = randStringRunes(5)
-					createdSecret = &v1.Secret{
+					createdSecret = &corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      keySecret.Name,
 							Namespace: keySecret.Namespace,
@@ -456,7 +455,7 @@ var _ = Describe("MongoDB", func() {
 				var (
 					createdDB     *infrav1beta1.MongoDBDatabase
 					createdUser   *infrav1beta1.MongoDBUser
-					createdSecret *v1.Secret
+					createdSecret *corev1.Secret
 					keyUser       types.NamespacedName
 					keyDB         types.NamespacedName
 					keySecret     types.NamespacedName
@@ -530,7 +529,7 @@ var _ = Describe("MongoDB", func() {
 
 					It("adds secret", func() {
 						password = randStringRunes(5)
-						createdSecret = &v1.Secret{
+						createdSecret = &corev1.Secret{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      keySecret.Name,
 								Namespace: keySecret.Namespace,
@@ -561,7 +560,7 @@ var _ = Describe("MongoDB", func() {
 						o.SetServerSelectionTimeout(time.Duration(1) * time.Second)
 						o.ApplyURI(container.URI)
 						o.SetAuth(options.Credential{
-							AuthSource: createdDB.ObjectMeta.Name,
+							AuthSource: createdDB.Name,
 							Username:   keyUser.Name,
 							Password:   password,
 						})
@@ -590,7 +589,7 @@ var _ = Describe("MongoDB", func() {
 						o.SetServerSelectionTimeout(time.Duration(1) * time.Second)
 						o.ApplyURI(container.URI)
 						o.SetAuth(options.Credential{
-							AuthSource: createdDB.ObjectMeta.Name,
+							AuthSource: createdDB.Name,
 							Username:   keyUser.Name,
 							Password:   "invalid",
 						})
@@ -608,7 +607,7 @@ var _ = Describe("MongoDB", func() {
 					It("changes password in referenced user secret", func() {
 						password = randStringRunes(5)
 						createdSecret.Data = map[string][]byte{
-							"username": []byte(createdUser.ObjectMeta.Name),
+							"username": []byte(createdUser.Name),
 							"password": []byte(password),
 						}
 						Expect(k8sClient.Update(context.Background(), createdSecret)).Should(Succeed())
@@ -633,8 +632,8 @@ var _ = Describe("MongoDB", func() {
 						o.ApplyURI(container.URI)
 
 						o.SetAuth(options.Credential{
-							AuthSource: createdDB.ObjectMeta.Name,
-							Username:   createdUser.ObjectMeta.Name,
+							AuthSource: createdDB.Name,
+							Username:   createdUser.Name,
 							Password:   password,
 						})
 
@@ -687,8 +686,8 @@ var _ = Describe("MongoDB", func() {
 						o.ApplyURI(container.URI)
 
 						o.SetAuth(options.Credential{
-							AuthSource: createdDB.ObjectMeta.Name,
-							Username:   createdUser.ObjectMeta.Name,
+							AuthSource: createdDB.Name,
+							Username:   createdUser.Name,
 							Password:   password,
 						})
 
@@ -732,8 +731,8 @@ var _ = Describe("MongoDB", func() {
 						o.ApplyURI(container.URI)
 
 						o.SetAuth(options.Credential{
-							AuthSource: createdDB.ObjectMeta.Name,
-							Username:   createdUser.ObjectMeta.Name,
+							AuthSource: createdDB.Name,
+							Username:   createdUser.Name,
 							Password:   password,
 						})
 

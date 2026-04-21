@@ -132,7 +132,7 @@ func (m *MongoDBRepository) getAllUsers(ctx context.Context, database string, us
 		return users, err
 	}
 
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	for cursor.Next(ctx) {
 		var user MongoDBUser

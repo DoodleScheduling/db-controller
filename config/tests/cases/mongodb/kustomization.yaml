@@ -12,10 +12,13 @@ resources:
 helmCharts:
 - repo: https://charts.bitnami.com/bitnami
   name: mongodb
-  version: 13.10.2
+  version: 18.5.0
   releaseName: mongodb
   namespace: db-system
   valuesInline:
+    image:
+      repository: bitnamilegacy/mongodb
+      tag: 8.0.13-debian-12-r0
     persistence:
       enabled: false
     auth:

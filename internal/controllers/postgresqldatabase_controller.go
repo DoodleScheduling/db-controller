@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,7 +48,7 @@ type PostgreSQLDatabaseReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 func (r *PostgreSQLDatabaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -115,7 +115,7 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	_ = db.SetDefaults()
 
 	// examine DeletionTimestamp to determine if object is under deletion
-	if db.ObjectMeta.DeletionTimestamp.IsZero() {
+	if db.DeletionTimestamp.IsZero() {
 		if !stringutils.ContainsString(db.GetFinalizers(), infrav1beta1.Finalizer) {
 			controllerutil.AddFinalizer(&db, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &db); err != nil {
@@ -136,10 +136,10 @@ func (r *PostgreSQLDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	db.Status.ObservedGeneration = db.GetGeneration()
 
 	if reconcileErr != nil {
-		r.Recorder.Event(&db, "Normal", "error", reconcileErr.Error())
+		r.Recorder.Eventf(&db, nil, "Normal", "error", "Reconcile", "%s", reconcileErr.Error())
 	} else {
 		msg := "Database successfully provisioned"
-		r.Recorder.Event(&db, "Normal", "info", msg)
+		r.Recorder.Eventf(&db, nil, "Normal", "info", "Reconcile", "%s", msg)
 		infrav1beta1.DatabaseReadyCondition(&db, infrav1beta1.DatabaseProvisioningSuccessfulReason, msg)
 	}
 
@@ -167,9 +167,9 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 		return db, err
 	}
 
-	defer rootDBHandler.Close(ctx)
+	defer func() { _ = rootDBHandler.Close(ctx) }()
 
-	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !db.DeletionTimestamp.IsZero() {
 		return r.finalizeDatabase(ctx, db)
 	}
 
@@ -187,7 +187,7 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 		return db, err
 	}
 
-	defer dbHandler.Close(ctx)
+	defer func() { _ = dbHandler.Close(ctx) }()
 
 	for _, ext := range db.Spec.Extensions {
 		if err := dbHandler.EnableExtension(ctx, db.GetDatabaseName(), ext.Name); err != nil {
@@ -227,8 +227,8 @@ func (r *PostgreSQLDatabaseReconciler) reconcile(ctx context.Context, db infrav1
 }
 
 func (r *PostgreSQLDatabaseReconciler) finalizeDatabase(ctx context.Context, db infrav1beta1.PostgreSQLDatabase) (infrav1beta1.PostgreSQLDatabase, error) {
-	if stringutils.ContainsString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
-		db.ObjectMeta.Finalizers = stringutils.RemoveString(db.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
+	if stringutils.ContainsString(db.Finalizers, infrav1beta1.Finalizer) {
+		db.Finalizers = stringutils.RemoveString(db.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &db); err != nil {
 			return db, err
 		}
@@ -240,7 +240,7 @@ func (r *PostgreSQLDatabaseReconciler) finalizeDatabase(ctx context.Context, db 
 func (r *PostgreSQLDatabaseReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLDatabase) error {
 	key := client.ObjectKeyFromObject(database)
 	latest := &infrav1beta1.PostgreSQLDatabase{}
-	if err := r.Client.Get(ctx, key, latest); err != nil {
+	if err := r.Get(ctx, key, latest); err != nil {
 		return err
 	}
 

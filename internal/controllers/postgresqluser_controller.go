@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,7 +52,7 @@ type PostgreSQLUserReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 func (r *PostgreSQLUserReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
@@ -153,7 +153,7 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
-	if user.ObjectMeta.DeletionTimestamp.IsZero() {
+	if user.DeletionTimestamp.IsZero() {
 		if !stringutils.ContainsString(user.GetFinalizers(), infrav1beta1.Finalizer) {
 			controllerutil.AddFinalizer(&user, infrav1beta1.Finalizer)
 			if err := r.Update(ctx, &user); err != nil {
@@ -167,10 +167,10 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	user.Status.ObservedGeneration = user.GetGeneration()
 
 	if reconcileErr != nil {
-		r.Recorder.Event(&user, "Normal", "error", reconcileErr.Error())
+		r.Recorder.Eventf(&user, nil, "Normal", "error", "Reconcile", "%s", reconcileErr.Error())
 	} else {
 		msg := "User successfully provisioned"
-		r.Recorder.Event(&user, "Normal", "info", msg)
+		r.Recorder.Eventf(&user, nil, "Normal", "info", "Reconcile", "%s", msg)
 		infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
 	}
 
@@ -191,7 +191,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		Name:      user.GetDatabase(),
 	}
 
-	err := r.Client.Get(ctx, databaseName, &db)
+	err := r.Get(ctx, databaseName, &db)
 	if err != nil {
 		err = fmt.Errorf("referencing database was not found: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
@@ -227,9 +227,9 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		return user, err
 	}
 
-	defer dbHandler.Close(ctx)
+	defer func() { _ = dbHandler.Close(ctx) }()
 
-	if !user.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !user.DeletionTimestamp.IsZero() {
 		return r.finalizeUser(ctx, user, db, dbHandler)
 	}
 
@@ -249,11 +249,12 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	}
 
 	userSpec := database.PostgresqlUser{
-		Database: db.GetDatabaseName(),
-		Username: usr,
-		Password: pw,
-		Roles:    user.Spec.Roles,
-		Grants:   grants,
+		Database:   db.GetDatabaseName(),
+		Username:   usr,
+		Password:   pw,
+		Roles:      user.Spec.Roles,
+		Grants:     grants,
+		Attributes: user.Spec.Attributes,
 	}
 
 	err = dbHandler.SetupUser(ctx, userSpec)
@@ -305,8 +306,8 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 		return user, err
 	}
 
-	if stringutils.ContainsString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer) {
-		user.ObjectMeta.Finalizers = stringutils.RemoveString(user.ObjectMeta.Finalizers, infrav1beta1.Finalizer)
+	if stringutils.ContainsString(user.Finalizers, infrav1beta1.Finalizer) {
+		user.Finalizers = stringutils.RemoveString(user.Finalizers, infrav1beta1.Finalizer)
 		if err := r.Update(ctx, &user); err != nil {
 			return user, err
 		}
@@ -318,7 +319,7 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 func (r *PostgreSQLUserReconciler) patchStatus(ctx context.Context, database *infrav1beta1.PostgreSQLUser) error {
 	key := client.ObjectKeyFromObject(database)
 	latest := &infrav1beta1.PostgreSQLUser{}
-	if err := r.Client.Get(ctx, key, latest); err != nil {
+	if err := r.Get(ctx, key, latest); err != nil {
 		return err
 	}
 
