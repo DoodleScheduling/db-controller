@@ -36,6 +36,11 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const (
+	postgresRootUsername = "root"
+	postgresRootPassword = "password"
+)
+
 type postgresqlContainer struct {
 	testcontainers.Container
 	URI string
@@ -45,29 +50,63 @@ func setupPostgreSQLContainer(ctx context.Context, image string) (*postgresqlCon
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor:   wait.ForListeningPort("5432"),
+		WaitingFor: wait.ForListeningPort("5432/tcp").
+			WithStartupTimeout(60 * time.Second),
 		Env: map[string]string{
-			"POSTGRES_USER":     "root",
-			"POSTGRES_PASSWORD": "password",
+			"POSTGRES_USER":     postgresRootUsername,
+			"POSTGRES_PASSWORD": postgresRootPassword,
 		},
 	}
+
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	ip, err := container.ContainerIP(ctx)
+	host, err := container.Host(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uri := fmt.Sprintf("postgresql://%s:5432", ip)
+	port, err := container.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		return nil, err
+	}
+
+	uri := fmt.Sprintf("postgresql://%s:%s", host, port.Port())
 
 	return &postgresqlContainer{Container: container, URI: uri}, nil
+}
+
+func connectAsPostgreSQLRoot(
+	ctx context.Context,
+	uri string,
+	timeout time.Duration,
+	interval time.Duration,
+) *pgx.Conn {
+	popt, err := url.Parse(uri)
+	Expect(err).NotTo(HaveOccurred(), "failed to parse postgresql uri")
+
+	popt.User = url.UserPassword(postgresRootUsername, postgresRootPassword)
+
+	q, _ := url.ParseQuery(popt.RawQuery)
+	q.Add("connect_timeout", "2")
+	popt.RawQuery = q.Encode()
+
+	popt.Path = "postgres"
+
+	var conn *pgx.Conn
+
+	Eventually(func() error {
+		c, err := pgx.Connect(ctx, popt.String())
+		conn = c
+		return err
+	}, timeout, interval).Should(Succeed())
+
+	return conn
 }
 
 var _ = Describe("PostgreSQL", func() {
@@ -457,13 +496,14 @@ var _ = Describe("PostgreSQL", func() {
 
 			Describe("Successful user creation", Ordered, func() {
 				var (
-					createdDB     *infrav1beta1.PostgreSQLDatabase
-					createdUser   *infrav1beta1.PostgreSQLUser
-					createdSecret *corev1.Secret
-					keyUser       types.NamespacedName
-					keyDB         types.NamespacedName
-					keySecret     types.NamespacedName
-					password      string
+					createdDB          *infrav1beta1.PostgreSQLDatabase
+					createdUser        *infrav1beta1.PostgreSQLUser
+					createdSecret      *corev1.Secret
+					keyUser            types.NamespacedName
+					keyDB              types.NamespacedName
+					keySecret          types.NamespacedName
+					password           string
+					expectedValidUntil time.Time
 				)
 
 				namespace, rootSecret := setupNamespace()
@@ -570,6 +610,86 @@ var _ = Describe("PostgreSQL", func() {
 
 						_, err = client.Exec(ctx, fmt.Sprintln("CREATE TABLE foo (key integer);"))
 						Expect(err).NotTo(HaveOccurred(), "failed to insert doc")
+					})
+
+					Describe("ValidUntil", Ordered, func() {
+						It("sets validUntil for the user", func() {
+							err := k8sClient.Get(context.Background(), keyUser, createdUser)
+							Expect(err).Should(Succeed())
+
+							expectedValidUntil = time.Now().Add(1 * time.Hour).UTC().Truncate(time.Second)
+							validUntil := metav1.NewTime(expectedValidUntil)
+							createdUser.Spec.ValidUntil = &validUntil
+
+							Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+						})
+
+						It("expects ready user after setting validUntil", func() {
+							got := &infrav1beta1.PostgreSQLUser{}
+
+							Eventually(func() bool {
+								_ = k8sClient.Get(context.Background(), keyUser, got)
+
+								return len(got.Status.Conditions) == 1 &&
+									got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+									got.Status.Conditions[0].Status == "True" &&
+									got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+									got.ObjectMeta.Generation == got.Status.ObservedGeneration
+							}, timeout, interval).Should(BeTrue())
+						})
+
+						It("sets rolvaliduntil in postgres", func() {
+							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
+							defer conn.Close(ctx)
+
+							var rolValidUntil time.Time
+							err := conn.QueryRow(ctx, `
+								SELECT rolvaliduntil
+								FROM pg_roles
+								WHERE rolname = $1
+							`, keyUser.Name).Scan(&rolValidUntil)
+
+							Expect(err).NotTo(HaveOccurred())
+							Expect(rolValidUntil.UTC()).To(BeTemporally("~", expectedValidUntil, time.Second))
+						})
+
+						It("resets validUntil to infinity when removed from the spec", func() {
+							err := k8sClient.Get(context.Background(), keyUser, createdUser)
+							Expect(err).Should(Succeed())
+
+							createdUser.Spec.ValidUntil = nil
+
+							Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+						})
+
+						It("expects ready user after removing validUntil", func() {
+							got := &infrav1beta1.PostgreSQLUser{}
+
+							Eventually(func() bool {
+								_ = k8sClient.Get(context.Background(), keyUser, got)
+
+								return len(got.Status.Conditions) == 1 &&
+									got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+									got.Status.Conditions[0].Status == "True" &&
+									got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+									got.ObjectMeta.Generation == got.Status.ObservedGeneration
+							}, timeout, interval).Should(BeTrue())
+						})
+
+						It("sets rolvaliduntil back to infinity in postgres", func() {
+							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
+							defer conn.Close(ctx)
+
+							var rolValidUntil string
+							err := conn.QueryRow(ctx, `
+								SELECT rolvaliduntil::text
+								FROM pg_roles
+								WHERE rolname = $1
+							`, keyUser.Name).Scan(&rolValidUntil)
+
+							Expect(err).NotTo(HaveOccurred())
+							Expect(rolValidUntil).To(Equal("infinity"))
+						})
 					})
 
 					It("has has no access to another database", func() {

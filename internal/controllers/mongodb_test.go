@@ -44,7 +44,8 @@ func setupMongoDBContainer(ctx context.Context, image string) (*mongodbContainer
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		ExposedPorts: []string{"27017/tcp"},
-		WaitingFor:   wait.ForListeningPort("27017"),
+		WaitingFor: wait.ForListeningPort("27017/tcp").
+			WithStartupTimeout(60 * time.Second),
 		Env: map[string]string{
 			"MONGO_INITDB_ROOT_USERNAME": "root",
 			"MONGO_INITDB_ROOT_PASSWORD": "password",
@@ -53,21 +54,26 @@ func setupMongoDBContainer(ctx context.Context, image string) (*mongodbContainer
 			"/data/db": "",
 		},
 	}
+
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	ip, err := container.ContainerIP(ctx)
+	host, err := container.Host(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uri := fmt.Sprintf("mongodb://%s:27017", ip)
+	port, err := container.MappedPort(ctx, "27017/tcp")
+	if err != nil {
+		return nil, err
+	}
+
+	uri := fmt.Sprintf("mongodb://%s:%s", host, port.Port())
 
 	return &mongodbContainer{Container: container, URI: uri}, nil
 }
