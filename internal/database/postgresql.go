@@ -297,15 +297,23 @@ func (s *PostgreSQLRepository) setAttributes(ctx context.Context, user Postgresq
 }
 
 func (s *PostgreSQLRepository) setValidUntil(ctx context.Context, user PostgresqlUser) error {
-	if user.ValidUntil == nil {
-		return nil
-	}
-	_, err := s.conn.Exec(
-		ctx, fmt.Sprintf("ALTER ROLE %s VALID UNTIL $1;", (pgx.Identifier{user.Username}).Sanitize()),
-		*user.ValidUntil,
-	)
 
+	if user.ValidUntil != nil {
+		_, err := s.conn.Exec(
+			ctx,
+			fmt.Sprintf("ALTER ROLE %s VALID UNTIL $1;",
+				(pgx.Identifier{user.Username}).Sanitize()),
+			*user.ValidUntil,
+		)
+		return err
+	}
+
+	_, err := s.conn.Exec(
+		ctx, fmt.Sprintf("ALTER ROLE %s VALID UNTIL 'infinity';",
+			(pgx.Identifier{user.Username}).Sanitize()),
+	)
 	return err
+
 }
 
 func (s *PostgreSQLRepository) RevokeAllPrivileges(ctx context.Context, user PostgresqlUser) error {
