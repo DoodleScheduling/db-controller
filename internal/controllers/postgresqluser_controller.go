@@ -237,7 +237,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	}
 
 	if user.Spec.ValidUntil != nil {
-		validUntil := user.Spec.ValidUntil.Time.UTC()
+		validUntil := user.Spec.ValidUntil.UTC()
 		now := time.Now().UTC()
 
 		if !validUntil.After(now) {

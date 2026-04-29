@@ -719,7 +719,7 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
 					})
 
-					It("expects ready user after validUntil has expired", func() {
+					It("expects ready user after disabling expired user", func() {
 						got := &infrav1beta1.PostgreSQLUser{}
 
 						Eventually(func() bool {
