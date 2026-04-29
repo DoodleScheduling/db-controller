@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -98,7 +97,6 @@ type PostgresqlUser struct {
 	Roles      []string
 	Grants     []Grant
 	Attributes []string
-	ValidUntil *time.Time
 }
 
 type Grant struct {
@@ -132,10 +130,6 @@ func (s *PostgreSQLRepository) SetupUser(ctx context.Context, user PostgresqlUse
 	if err := s.setAttributes(ctx, user); err != nil {
 		return fmt.Errorf("failed to set attributes: %w", err)
 	}
-	if err := s.setValidUntil(ctx, user); err != nil {
-		return fmt.Errorf("failed to set valid until: %w", err)
-	}
-
 	return nil
 }
 
@@ -294,29 +288,6 @@ func (s *PostgreSQLRepository) setAttributes(ctx context.Context, user Postgresq
 	}
 
 	return nil
-}
-
-func (s *PostgreSQLRepository) setValidUntil(ctx context.Context, user PostgresqlUser) error {
-
-	username := (pgx.Identifier{user.Username}).Sanitize()
-	validUntil := "infinity"
-
-	if user.ValidUntil != nil {
-		validUntil = user.ValidUntil.UTC().Format("2006-01-02 15:04:05Z07:00")
-	}
-
-	scapedValidUntil, err := s.conn.PgConn().EscapeString(validUntil)
-	if err != nil {
-		return err
-	}
-	_, err = s.conn.Exec(
-		ctx,
-		fmt.Sprintf("ALTER ROLE %s VALID UNTIL '%s';",
-			username,
-			scapedValidUntil),
-	)
-	return err
-
 }
 
 func (s *PostgreSQLRepository) RevokeAllPrivileges(ctx context.Context, user PostgresqlUser) error {

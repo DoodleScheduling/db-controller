@@ -81,34 +81,6 @@ func setupPostgreSQLContainer(ctx context.Context, image string) (*postgresqlCon
 	return &postgresqlContainer{Container: container, URI: uri}, nil
 }
 
-func connectAsPostgreSQLRoot(
-	ctx context.Context,
-	uri string,
-	timeout time.Duration,
-	interval time.Duration,
-) *pgx.Conn {
-	popt, err := url.Parse(uri)
-	Expect(err).NotTo(HaveOccurred(), "failed to parse postgresql uri")
-
-	popt.User = url.UserPassword(postgresRootUsername, postgresRootPassword)
-
-	q, _ := url.ParseQuery(popt.RawQuery)
-	q.Add("connect_timeout", "2")
-	popt.RawQuery = q.Encode()
-
-	popt.Path = "postgres"
-
-	var conn *pgx.Conn
-
-	Eventually(func() error {
-		c, err := pgx.Connect(ctx, popt.String())
-		conn = c
-		return err
-	}, timeout, interval).Should(Succeed())
-
-	return conn
-}
-
 var _ = Describe("PostgreSQL", func() {
 	const (
 		timeout  = time.Second * 5
@@ -496,14 +468,13 @@ var _ = Describe("PostgreSQL", func() {
 
 			Describe("Successful user creation", Ordered, func() {
 				var (
-					createdDB          *infrav1beta1.PostgreSQLDatabase
-					createdUser        *infrav1beta1.PostgreSQLUser
-					createdSecret      *corev1.Secret
-					keyUser            types.NamespacedName
-					keyDB              types.NamespacedName
-					keySecret          types.NamespacedName
-					password           string
-					expectedValidUntil time.Time
+					createdDB     *infrav1beta1.PostgreSQLDatabase
+					createdUser   *infrav1beta1.PostgreSQLUser
+					createdSecret *corev1.Secret
+					keyUser       types.NamespacedName
+					keyDB         types.NamespacedName
+					keySecret     types.NamespacedName
+					password      string
 				)
 
 				namespace, rootSecret := setupNamespace()
@@ -612,90 +583,6 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(err).NotTo(HaveOccurred(), "failed to insert doc")
 					})
 
-					Describe("ValidUntil", Ordered, func() {
-						It("sets validUntil for the user", func() {
-							err := k8sClient.Get(context.Background(), keyUser, createdUser)
-							Expect(err).Should(Succeed())
-
-							expectedValidUntil = time.Now().Add(1 * time.Hour).UTC().Truncate(time.Second)
-							validUntil := metav1.NewTime(expectedValidUntil)
-							createdUser.Spec.ValidUntil = &validUntil
-
-							Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
-						})
-
-						It("expects ready user after setting validUntil", func() {
-							got := &infrav1beta1.PostgreSQLUser{}
-
-							Eventually(func() bool {
-								_ = k8sClient.Get(context.Background(), keyUser, got)
-
-								return len(got.Status.Conditions) == 1 &&
-									got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
-									got.Status.Conditions[0].Status == "True" &&
-									got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
-									got.ObjectMeta.Generation == got.Status.ObservedGeneration
-							}, timeout, interval).Should(BeTrue())
-						})
-
-						It("sets rolvaliduntil in postgres", func() {
-							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
-							defer func() {
-								Expect(conn.Close(ctx)).To(Succeed())
-							}()
-
-							var rolValidUntil time.Time
-							err := conn.QueryRow(ctx, `
-								SELECT rolvaliduntil
-								FROM pg_roles
-								WHERE rolname = $1
-							`, keyUser.Name).Scan(&rolValidUntil)
-
-							Expect(err).NotTo(HaveOccurred())
-							Expect(rolValidUntil.UTC()).To(BeTemporally("~", expectedValidUntil, time.Second))
-						})
-
-						It("resets validUntil to infinity when removed from the spec", func() {
-							err := k8sClient.Get(context.Background(), keyUser, createdUser)
-							Expect(err).Should(Succeed())
-
-							createdUser.Spec.ValidUntil = nil
-
-							Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
-						})
-
-						It("expects ready user after removing validUntil", func() {
-							got := &infrav1beta1.PostgreSQLUser{}
-
-							Eventually(func() bool {
-								_ = k8sClient.Get(context.Background(), keyUser, got)
-
-								return len(got.Status.Conditions) == 1 &&
-									got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
-									got.Status.Conditions[0].Status == "True" &&
-									got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
-									got.ObjectMeta.Generation == got.Status.ObservedGeneration
-							}, timeout, interval).Should(BeTrue())
-						})
-
-						It("sets rolvaliduntil back to infinity in postgres", func() {
-							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
-							defer func() {
-								Expect(conn.Close(ctx)).To(Succeed())
-							}()
-
-							var rolValidUntil string
-							err := conn.QueryRow(ctx, `
-								SELECT rolvaliduntil::text
-								FROM pg_roles
-								WHERE rolname = $1
-							`, keyUser.Name).Scan(&rolValidUntil)
-
-							Expect(err).NotTo(HaveOccurred())
-							Expect(rolValidUntil).To(Equal("infinity"))
-						})
-					})
-
 					It("has has no access to another database", func() {
 						popt, err := url.Parse(container.URI)
 						Expect(err).NotTo(HaveOccurred(), "failed to parse postgresql uri")
@@ -771,6 +658,98 @@ var _ = Describe("PostgreSQL", func() {
 							_, err := pgx.Connect(ctx, popt.String())
 							return err
 						}, timeout, interval).Should(Succeed())
+					})
+				})
+
+				Describe("ValidUntil", Ordered, func() {
+					It("sets validUntil in the future for the user", func() {
+						err := k8sClient.Get(context.Background(), keyUser, createdUser)
+						Expect(err).Should(Succeed())
+
+						validUntil := metav1.NewTime(time.Now().Add(1 * time.Hour).UTC())
+						createdUser.Spec.ValidUntil = &validUntil
+
+						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+					})
+
+					It("expects ready user after setting validUntil in the future", func() {
+						got := &infrav1beta1.PostgreSQLUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Status == "True" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
+					It("can still access the database before validUntil expires", func() {
+						popt, err := url.Parse(container.URI)
+						Expect(err).NotTo(HaveOccurred(), "failed to parse postgresql uri")
+
+						popt.User = url.UserPassword(keyUser.Name, password)
+						q, _ := url.ParseQuery(popt.RawQuery)
+						q.Add("connect_timeout", "2")
+						popt.RawQuery = q.Encode()
+						popt.Path = keyDB.Name
+
+						var client *pgx.Conn
+
+						Eventually(func() error {
+							c, err := pgx.Connect(ctx, popt.String())
+							client = c
+							return err
+						}, timeout, interval).Should(Succeed())
+
+						defer func() {
+							Expect(client.Close(ctx)).To(Succeed())
+						}()
+					})
+
+					It("sets validUntil in the past for the user", func() {
+						err := k8sClient.Get(context.Background(), keyUser, createdUser)
+						Expect(err).Should(Succeed())
+
+						validUntil := metav1.NewTime(time.Now().Add(-1 * time.Hour).UTC())
+						createdUser.Spec.ValidUntil = &validUntil
+
+						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+					})
+
+					It("expects ready user after validUntil has expired", func() {
+						got := &infrav1beta1.PostgreSQLUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Status == "True" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
+					It("cannot access the database with the original password after validUntil expired", func() {
+						popt, err := url.Parse(container.URI)
+						Expect(err).NotTo(HaveOccurred(), "failed to parse postgresql uri")
+
+						popt.User = url.UserPassword(keyUser.Name, password)
+						q, _ := url.ParseQuery(popt.RawQuery)
+						q.Add("connect_timeout", "2")
+						popt.RawQuery = q.Encode()
+						popt.Path = keyDB.Name
+
+						Eventually(func() error {
+							conn, err := pgx.Connect(ctx, popt.String())
+							if err == nil {
+								_ = conn.Close(ctx)
+							}
+							return err
+						}, timeout, interval).ShouldNot(Succeed())
 					})
 				})
 
