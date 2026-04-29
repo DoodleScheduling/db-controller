@@ -299,21 +299,21 @@ func (s *PostgreSQLRepository) setAttributes(ctx context.Context, user Postgresq
 func (s *PostgreSQLRepository) setValidUntil(ctx context.Context, user PostgresqlUser) error {
 
 	username := (pgx.Identifier{user.Username}).Sanitize()
+	validUntil := "infinity"
 
 	if user.ValidUntil != nil {
-		_, err := s.conn.Exec(
-			ctx,
-			fmt.Sprintf("ALTER ROLE %s VALID UNTIL $1;",
-				username),
-			*user.ValidUntil,
-		)
-		return err
+		validUntil = user.ValidUntil.UTC().Format("2006-01-02 15:04:05Z07:00")
 	}
 
-	_, err := s.conn.Exec(
+	scapedValidUntil, err := s.conn.PgConn().EscapeString(validUntil)
+	if err != nil {
+		return err
+	}
+	_, err = s.conn.Exec(
 		ctx,
-		fmt.Sprintf("ALTER ROLE %s VALID UNTIL 'infinity';",
-			username),
+		fmt.Sprintf("ALTER ROLE %s VALID UNTIL '%s';",
+			username,
+			scapedValidUntil),
 	)
 	return err
 
