@@ -43,6 +43,7 @@ type PostgreSQLUserSpec struct {
 
 	// ValidUntil defines until when this PostgreSQL user can log in.
 	// After this timestamp, PostgreSQL rejects authentication for this user.
+	// When omitted, the role expiration is reset to infinity.
 	// +optional
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 }
