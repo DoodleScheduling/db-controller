@@ -714,6 +714,94 @@ var _ = Describe("MongoDB", func() {
 					})
 				})
 
+				Describe("ValidUntil", Ordered, func() {
+					It("sets validUntil for the user", func() {
+						err := k8sClient.Get(context.Background(), keyUser, createdUser)
+						Expect(err).Should(Succeed())
+
+						validUntil := metav1.NewTime(time.Now().Add(5 * time.Second).UTC())
+						createdUser.Spec.ValidUntil = &validUntil
+
+						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+					})
+
+					It("expects ready user after setting validUntil", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Status == "True" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
+					It("can still authenticate before validUntil expires", func() {
+						o := options.Client()
+						o.SetConnectTimeout(time.Second)
+						o.SetServerSelectionTimeout(time.Second)
+						o.ApplyURI(container.URI)
+
+						o.SetAuth(options.Credential{
+							AuthSource: createdDB.Name,
+							Username:   keyUser.Name,
+							Password:   password,
+						})
+
+						client, err := mongo.Connect(ctx, o)
+						Expect(err).NotTo(HaveOccurred(), "failed to connect to mongodb")
+
+						defer func() {
+							Expect(client.Disconnect(ctx)).To(Succeed())
+						}()
+
+						Eventually(func() error {
+							return client.Ping(ctx, readpref.Primary())
+						}, timeout, interval).Should(Succeed())
+					})
+
+					It("cannot authenticate after validUntil expires", func() {
+						Eventually(func() error {
+							o := options.Client()
+							o.SetConnectTimeout(time.Second)
+							o.SetServerSelectionTimeout(time.Second)
+							o.ApplyURI(container.URI)
+
+							o.SetAuth(options.Credential{
+								AuthSource: createdDB.Name,
+								Username:   keyUser.Name,
+								Password:   password,
+							})
+
+							client, err := mongo.Connect(ctx, o)
+							if err != nil {
+								return err
+							}
+
+							defer func() {
+								_ = client.Disconnect(ctx)
+							}()
+
+							return client.Ping(ctx, readpref.Primary())
+						}, timeout, interval).ShouldNot(Succeed())
+					})
+					It("keeps the MongoDBUser resource after expiration", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+					})
+
+					It("keeps the finalizer after expiration", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+						Expect(got.Finalizers).To(ContainElement(infrav1beta1.Finalizer))
+					})
+				})
+
 				Describe("Delete user removes user from mongodb", Ordered, func() {
 					var (
 						client *mongo.Client
