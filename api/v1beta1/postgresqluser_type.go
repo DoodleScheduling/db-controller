@@ -40,6 +40,11 @@ type PostgreSQLUserSpec struct {
 
 	// Attributes are postgres attributes associated with this user
 	Attributes []string `json:"attributes,omitempty"`
+
+	// ValidUntil defines until when this PostgreSQL user can log in.
+	// After this timestamp, PostgreSQL rejects authentication for this user.
+	// +optional
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 }
 
 type Grant struct {

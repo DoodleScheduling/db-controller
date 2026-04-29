@@ -257,6 +257,10 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 		Attributes: user.Spec.Attributes,
 	}
 
+	if user.Spec.ValidUntil != nil {
+		userSpec.ValidUntil = &user.Spec.ValidUntil.Time
+	}
+
 	err = dbHandler.SetupUser(ctx, userSpec)
 	if err != nil {
 		err = fmt.Errorf("failed to provision user account: %w", err)

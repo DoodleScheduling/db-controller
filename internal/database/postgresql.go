@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -97,6 +98,7 @@ type PostgresqlUser struct {
 	Roles      []string
 	Grants     []Grant
 	Attributes []string
+	ValidUntil *time.Time
 }
 
 type Grant struct {
@@ -129,6 +131,9 @@ func (s *PostgreSQLRepository) SetupUser(ctx context.Context, user PostgresqlUse
 	}
 	if err := s.setAttributes(ctx, user); err != nil {
 		return fmt.Errorf("failed to set attributes: %w", err)
+	}
+	if err := s.setValidUntil(ctx, user); err != nil {
+		return fmt.Errorf("failed to set valid until: %w", err)
 	}
 
 	return nil
@@ -289,6 +294,18 @@ func (s *PostgreSQLRepository) setAttributes(ctx context.Context, user Postgresq
 	}
 
 	return nil
+}
+
+func (s *PostgreSQLRepository) setValidUntil(ctx context.Context, user PostgresqlUser) error {
+	if user.ValidUntil == nil {
+		return nil
+	}
+	_, err := s.conn.Exec(
+		ctx, fmt.Sprintf("ALTER ROLE %s VALID UNTIL $1;", (pgx.Identifier{user.Username}).Sanitize()),
+		*user.ValidUntil,
+	)
+
+	return err
 }
 
 func (s *PostgreSQLRepository) RevokeAllPrivileges(ctx context.Context, user PostgresqlUser) error {

@@ -115,6 +115,12 @@ spec:
                 items:
                   type: string
                 type: array
+              validUntil:
+                description: |-
+                  ValidUntil defines until when this PostgreSQL user can log in.
+                  After this timestamp, PostgreSQL rejects authentication for this user.
+                format: date-time
+                type: string
             required:
             - credentials
             - database
