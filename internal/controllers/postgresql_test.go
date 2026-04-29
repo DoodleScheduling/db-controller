@@ -640,7 +640,9 @@ var _ = Describe("PostgreSQL", func() {
 
 						It("sets rolvaliduntil in postgres", func() {
 							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
-							defer conn.Close(ctx)
+							defer func() {
+								Expect(conn.Close(ctx)).To(Succeed())
+							}()
 
 							var rolValidUntil time.Time
 							err := conn.QueryRow(ctx, `
@@ -678,7 +680,9 @@ var _ = Describe("PostgreSQL", func() {
 
 						It("sets rolvaliduntil back to infinity in postgres", func() {
 							conn := connectAsPostgreSQLRoot(ctx, container.URI, timeout, interval)
-							defer conn.Close(ctx)
+							defer func() {
+								Expect(conn.Close(ctx)).To(Succeed())
+							}()
 
 							var rolValidUntil string
 							err := conn.QueryRow(ctx, `
