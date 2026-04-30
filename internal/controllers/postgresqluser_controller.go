@@ -248,7 +248,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 			if err != nil {
 				return user, res, err
 			}
-			infrav1beta1.UserReadyCondition(
+			infrav1beta1.UserNotReadyCondition(
 				&user,
 				infrav1beta1.UserExpiredReason,
 				"User has expired and was disabled",
