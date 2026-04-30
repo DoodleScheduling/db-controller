@@ -268,7 +268,7 @@ func (r *MongoDBUserReconciler) reconcileGenericUser(ctx context.Context, user i
 	err = dbHandler.SetupUser(ctx, db.GetDatabaseName(), usr, pw, extractMongoDBUserRoles(user.GetRoles()))
 	if err != nil {
 		err = fmt.Errorf("failed to provision user account: %w", err)
-		infrav1beta1.UserReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
+		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, res, err
 	}
 

@@ -635,7 +635,7 @@ var _ = Describe("PostgreSQL", func() {
 						Eventually(func() bool {
 							_ = k8sClient.Get(context.Background(), keyUser, got)
 							return len(got.Status.Conditions) == 1 &&
-								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
 								got.Status.Conditions[0].Status == "True" &&
 								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
@@ -727,7 +727,7 @@ var _ = Describe("PostgreSQL", func() {
 
 							return len(got.Status.Conditions) == 1 &&
 								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
-								got.Status.Conditions[0].Status == "True" &&
+								got.Status.Conditions[0].Status == "False" &&
 								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
 								got.ObjectMeta.Generation == got.Status.ObservedGeneration
 						}, timeout, interval).Should(BeTrue())
