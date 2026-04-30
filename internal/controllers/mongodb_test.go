@@ -788,6 +788,21 @@ var _ = Describe("MongoDB", func() {
 							return client.Ping(ctx, readpref.Primary())
 						}, timeout, interval).ShouldNot(Succeed())
 					})
+
+					It("sets expired status after validUntil expires", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
+								got.Status.Conditions[0].Status == "False" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
 					It("keeps the MongoDBUser resource after expiration", func() {
 						got := &infrav1beta1.MongoDBUser{}
 

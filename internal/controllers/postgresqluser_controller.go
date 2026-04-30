@@ -168,10 +168,13 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if reconcileErr != nil {
 		r.Recorder.Eventf(&user, nil, "Normal", "error", "Reconcile", "%s", reconcileErr.Error())
-	} else {
+	} else if !isUserExpired(user.Status.Conditions) {
 		msg := "User successfully provisioned"
 		r.Recorder.Eventf(&user, nil, "Normal", "info", "Reconcile", "%s", msg)
 		infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
+	} else {
+		msg := "User has expired and was disabled"
+		r.Recorder.Eventf(&user, nil, "Normal", "info", "Reconcile", "%s", msg)
 	}
 
 	// Update status after reconciliation.
@@ -242,6 +245,14 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 		if !validUntil.After(now) {
 			user, err := r.disableUser(ctx, user, db, dbHandler)
+			if err != nil {
+				return user, res, err
+			}
+			infrav1beta1.UserReadyCondition(
+				&user,
+				infrav1beta1.UserExpiredReason,
+				"User has expired and was disabled",
+			)
 			return user, res, err
 		}
 

@@ -167,3 +167,13 @@ func getSecret(ctx context.Context, c client.Client, sec *infrav1beta1.SecretRef
 
 	return usr, pw, addr, err
 }
+
+func isUserExpired(conditions []metav1.Condition) bool {
+	for _, condition := range conditions {
+		if condition.Type == infrav1beta1.UserReadyConditionType &&
+			condition.Reason == infrav1beta1.UserExpiredReason {
+			return true
+		}
+	}
+	return false
+}

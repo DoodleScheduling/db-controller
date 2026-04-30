@@ -635,7 +635,7 @@ var _ = Describe("PostgreSQL", func() {
 						Eventually(func() bool {
 							_ = k8sClient.Get(context.Background(), keyUser, got)
 							return len(got.Status.Conditions) == 1 &&
-								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
 								got.Status.Conditions[0].Status == "True" &&
 								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType
 
@@ -719,14 +719,14 @@ var _ = Describe("PostgreSQL", func() {
 						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
 					})
 
-					It("expects ready user after disabling expired user", func() {
+					It("sets expired status after validUntil expires", func() {
 						got := &infrav1beta1.PostgreSQLUser{}
 
 						Eventually(func() bool {
 							_ = k8sClient.Get(context.Background(), keyUser, got)
 
 							return len(got.Status.Conditions) == 1 &&
-								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
 								got.Status.Conditions[0].Status == "True" &&
 								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
 								got.ObjectMeta.Generation == got.Status.ObservedGeneration
@@ -751,8 +751,20 @@ var _ = Describe("PostgreSQL", func() {
 							return err
 						}, timeout, interval).ShouldNot(Succeed())
 					})
-				})
 
+					It("keeps the PostgreSQLUser resource after expiration", func() {
+						got := &infrav1beta1.PostgreSQLUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+					})
+
+					It("keeps the finalizer after expiration", func() {
+						got := &infrav1beta1.PostgreSQLUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+						Expect(got.Finalizers).To(ContainElement(infrav1beta1.Finalizer))
+					})
+				})
 				Describe("Delete user removes user from postgres", Ordered, func() {
 					It("deletes user", func() {
 						Expect(k8sClient.Delete(context.Background(), createdUser)).Should(Succeed())
