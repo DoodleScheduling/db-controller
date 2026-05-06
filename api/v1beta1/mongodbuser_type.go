@@ -37,6 +37,11 @@ type MongoDBUserSpec struct {
 	// +optional
 	// +kubebuilder:default:={{name: readWrite}}
 	Roles *[]MongoDBUserRole `json:"roles"`
+	// ValidUntil defines until when this database user should remain active.
+	// After this timestamp, the controller disables the user by deleting it.
+	// When omitted, the user remains active until the resource is deleted.
+	// +optional
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 }
 
 // GetStatusConditions returns a pointer to the Status.Conditions slice

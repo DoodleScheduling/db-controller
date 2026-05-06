@@ -40,6 +40,13 @@ type PostgreSQLUserSpec struct {
 
 	// Attributes are postgres attributes associated with this user
 	Attributes []string `json:"attributes,omitempty"`
+
+	// ValidUntil defines until when this database user should remain active.
+	// After this timestamp, the controller disables the user by rotating its password
+	// and revoking its privileges.
+	// When omitted, the user remains active until the resource is deleted.
+	// +optional
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 }
 
 type Grant struct {

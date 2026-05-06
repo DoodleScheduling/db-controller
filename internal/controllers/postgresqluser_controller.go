@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -162,16 +163,18 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	user, reconcileErr := r.reconcile(ctx, user)
-	res := ctrl.Result{}
+	user, res, reconcileErr := r.reconcile(ctx, user)
 	user.Status.ObservedGeneration = user.GetGeneration()
 
 	if reconcileErr != nil {
 		r.Recorder.Eventf(&user, nil, "Normal", "error", "Reconcile", "%s", reconcileErr.Error())
-	} else {
+	} else if !isUserExpired(user.Status.Conditions) {
 		msg := "User successfully provisioned"
 		r.Recorder.Eventf(&user, nil, "Normal", "info", "Reconcile", "%s", msg)
 		infrav1beta1.UserReadyCondition(&user, infrav1beta1.UserProvisioningSuccessfulReason, msg)
+	} else {
+		msg := "User has expired and was disabled"
+		r.Recorder.Eventf(&user, nil, "Normal", "info", "Reconcile", "%s", msg)
 	}
 
 	// Update status after reconciliation.
@@ -183,7 +186,9 @@ func (r *PostgreSQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return res, reconcileErr
 }
 
-func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser) (infrav1beta1.PostgreSQLUser, error) {
+func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1beta1.PostgreSQLUser) (infrav1beta1.PostgreSQLUser, ctrl.Result, error) {
+	res := ctrl.Result{}
+
 	// Fetch referencing database
 	var db infrav1beta1.PostgreSQLDatabase
 	databaseName := types.NamespacedName{
@@ -195,7 +200,7 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	if err != nil {
 		err = fmt.Errorf("referencing database was not found: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.DatabaseNotFoundReason, err.Error())
-		return user, err
+		return user, res, err
 	}
 
 	if db.Spec.Timeout != nil {
@@ -209,28 +214,49 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return user, err
+		return user, res, err
 	}
-
+	user.Status.Username = usr
 	// Fetch referencing root secret
 	rootUsr, rootPw, addr, err := getSecret(ctx, r.Client, db.GetRootSecret())
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.CredentialsNotFoundReason, err.Error())
-		return user, err
+		return user, res, err
 	}
 
 	dbHandler, err := setupPostgreSQL(ctx, db, rootUsr, rootPw, addr, true)
 
 	if err != nil {
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
-		return user, err
+		return user, res, err
 	}
 
 	defer func() { _ = dbHandler.Close(ctx) }()
 
 	if !user.DeletionTimestamp.IsZero() {
-		return r.finalizeUser(ctx, user, db, dbHandler)
+		user, err := r.finalizeUser(ctx, user, db, dbHandler)
+		return user, res, err
+	}
+
+	if user.Spec.ValidUntil != nil {
+		validUntil := user.Spec.ValidUntil.UTC()
+		now := time.Now().UTC()
+
+		if !validUntil.After(now) {
+			user, err := r.disableUser(ctx, user, db, dbHandler)
+			if err != nil {
+				return user, res, err
+			}
+			infrav1beta1.UserNotReadyCondition(
+				&user,
+				infrav1beta1.UserExpiredReason,
+				"User has expired and was disabled",
+			)
+			return user, res, err
+		}
+
+		res.RequeueAfter = validUntil.Sub(now)
 	}
 
 	var grants []database.Grant
@@ -261,12 +287,10 @@ func (r *PostgreSQLUserReconciler) reconcile(ctx context.Context, user infrav1be
 	if err != nil {
 		err = fmt.Errorf("failed to provision user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
-		return user, err
+		return user, res, err
 	}
 
-	user.Status.Username = usr
-
-	return user, nil
+	return user, res, nil
 }
 
 func generateToken(length int) string {
@@ -278,6 +302,23 @@ func generateToken(length int) string {
 }
 
 func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, dbHandler *database.PostgreSQLRepository) (infrav1beta1.PostgreSQLUser, error) {
+
+	user, err := r.disableUser(ctx, user, db, dbHandler)
+	if err != nil {
+		return user, err
+	}
+
+	if stringutils.ContainsString(user.Finalizers, infrav1beta1.Finalizer) {
+		user.Finalizers = stringutils.RemoveString(user.Finalizers, infrav1beta1.Finalizer)
+		if err := r.Update(ctx, &user); err != nil {
+			return user, err
+		}
+	}
+
+	return user, nil
+}
+
+func (r *PostgreSQLUserReconciler) disableUser(ctx context.Context, user infrav1beta1.PostgreSQLUser, db infrav1beta1.PostgreSQLDatabase, dbHandler *database.PostgreSQLRepository) (infrav1beta1.PostgreSQLUser, error) {
 	if user.Status.Username == "" {
 		return user, nil
 	}
@@ -304,13 +345,6 @@ func (r *PostgreSQLUserReconciler) finalizeUser(ctx context.Context, user infrav
 		err = fmt.Errorf("failed to revoke privileges from user account: %w", err)
 		infrav1beta1.UserNotReadyCondition(&user, infrav1beta1.ConnectionFailedReason, err.Error())
 		return user, err
-	}
-
-	if stringutils.ContainsString(user.Finalizers, infrav1beta1.Finalizer) {
-		user.Finalizers = stringutils.RemoveString(user.Finalizers, infrav1beta1.Finalizer)
-		if err := r.Update(ctx, &user); err != nil {
-			return user, err
-		}
 	}
 
 	return user, nil

@@ -115,6 +115,14 @@ spec:
                 items:
                   type: string
                 type: array
+              validUntil:
+                description: |-
+                  ValidUntil defines until when this database user should remain active.
+                  After this timestamp, the controller disables the user by rotating its password
+                  and revoking its privileges.
+                  When omitted, the user remains active until the resource is deleted.
+                format: date-time
+                type: string
             required:
             - credentials
             - database

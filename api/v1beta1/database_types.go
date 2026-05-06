@@ -27,6 +27,7 @@ const (
 	DatabaseNotFoundReason               = "DatabaseNotFoundReason"
 	UserNotProvisionedReason             = "UserNotProvisioned"
 	UserProvisioningSuccessfulReason     = "UserProvisioningSuccessful"
+	UserExpiredReason                    = "UserExpired"
 	CredentialsNotFoundReason            = "CredentialsNotFound"
 	CreateDatabaseFailedReason           = "CreateDatabaseFailed"
 	CreateExtensionsFailedReason         = "CreateExtensionsFailed"

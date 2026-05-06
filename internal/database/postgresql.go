@@ -130,7 +130,6 @@ func (s *PostgreSQLRepository) SetupUser(ctx context.Context, user PostgresqlUse
 	if err := s.setAttributes(ctx, user); err != nil {
 		return fmt.Errorf("failed to set attributes: %w", err)
 	}
-
 	return nil
 }
 

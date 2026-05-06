@@ -106,6 +106,15 @@ func (m *MongoDBRepository) SetupUser(ctx context.Context, database string, user
 }
 
 func (m *MongoDBRepository) DropUser(ctx context.Context, database string, username string) error {
+	doesUserExist, err := m.doesUserExist(ctx, database, username)
+	if err != nil {
+		return err
+	}
+
+	if !doesUserExist {
+		return nil
+	}
+
 	command := &bson.D{primitive.E{Key: "dropUser", Value: username}}
 	r := m.runCommand(ctx, database, command)
 	if _, err := r.Raw(); err != nil {

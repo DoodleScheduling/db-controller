@@ -44,7 +44,8 @@ func setupMongoDBContainer(ctx context.Context, image string) (*mongodbContainer
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		ExposedPorts: []string{"27017/tcp"},
-		WaitingFor:   wait.ForListeningPort("27017"),
+		WaitingFor: wait.ForListeningPort("27017/tcp").
+			WithStartupTimeout(60 * time.Second),
 		Env: map[string]string{
 			"MONGO_INITDB_ROOT_USERNAME": "root",
 			"MONGO_INITDB_ROOT_PASSWORD": "password",
@@ -53,21 +54,26 @@ func setupMongoDBContainer(ctx context.Context, image string) (*mongodbContainer
 			"/data/db": "",
 		},
 	}
+
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	ip, err := container.ContainerIP(ctx)
+	host, err := container.Host(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uri := fmt.Sprintf("mongodb://%s:27017", ip)
+	port, err := container.MappedPort(ctx, "27017/tcp")
+	if err != nil {
+		return nil, err
+	}
+
+	uri := fmt.Sprintf("mongodb://%s:%s", host, port.Port())
 
 	return &mongodbContainer{Container: container, URI: uri}, nil
 }
@@ -705,6 +711,109 @@ var _ = Describe("MongoDB", func() {
 							_, err := client.Database("foo").Collection(randStringRunes(5)).Find(ctx, bson.D{})
 							return err
 						}, timeout, interval).Should(Succeed())
+					})
+				})
+
+				Describe("ValidUntil", Ordered, func() {
+					It("sets validUntil for the user", func() {
+						err := k8sClient.Get(context.Background(), keyUser, createdUser)
+						Expect(err).Should(Succeed())
+
+						validUntil := metav1.NewTime(time.Now().Add(5 * time.Second).UTC())
+						createdUser.Spec.ValidUntil = &validUntil
+
+						Expect(k8sClient.Update(context.Background(), createdUser)).Should(Succeed())
+					})
+
+					It("expects ready user after setting validUntil", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserProvisioningSuccessfulReason &&
+								got.Status.Conditions[0].Status == "True" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
+					It("can still authenticate before validUntil expires", func() {
+						o := options.Client()
+						o.SetConnectTimeout(time.Second)
+						o.SetServerSelectionTimeout(time.Second)
+						o.ApplyURI(container.URI)
+
+						o.SetAuth(options.Credential{
+							AuthSource: createdDB.Name,
+							Username:   keyUser.Name,
+							Password:   password,
+						})
+
+						client, err := mongo.Connect(ctx, o)
+						Expect(err).NotTo(HaveOccurred(), "failed to connect to mongodb")
+
+						defer func() {
+							Expect(client.Disconnect(ctx)).To(Succeed())
+						}()
+
+						Eventually(func() error {
+							return client.Ping(ctx, readpref.Primary())
+						}, timeout, interval).Should(Succeed())
+					})
+
+					It("cannot authenticate after validUntil expires", func() {
+						Eventually(func() error {
+							o := options.Client()
+							o.SetConnectTimeout(time.Second)
+							o.SetServerSelectionTimeout(time.Second)
+							o.ApplyURI(container.URI)
+
+							o.SetAuth(options.Credential{
+								AuthSource: createdDB.Name,
+								Username:   keyUser.Name,
+								Password:   password,
+							})
+
+							client, err := mongo.Connect(ctx, o)
+							if err != nil {
+								return err
+							}
+
+							defer func() {
+								_ = client.Disconnect(ctx)
+							}()
+
+							return client.Ping(ctx, readpref.Primary())
+						}, timeout, interval).ShouldNot(Succeed())
+					})
+
+					It("sets expired status after validUntil expires", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Eventually(func() bool {
+							_ = k8sClient.Get(context.Background(), keyUser, got)
+
+							return len(got.Status.Conditions) == 1 &&
+								got.Status.Conditions[0].Reason == infrav1beta1.UserExpiredReason &&
+								got.Status.Conditions[0].Status == "False" &&
+								got.Status.Conditions[0].Type == infrav1beta1.UserReadyConditionType &&
+								got.ObjectMeta.Generation == got.Status.ObservedGeneration
+						}, timeout, interval).Should(BeTrue())
+					})
+
+					It("keeps the MongoDBUser resource after expiration", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+					})
+
+					It("keeps the finalizer after expiration", func() {
+						got := &infrav1beta1.MongoDBUser{}
+
+						Expect(k8sClient.Get(context.Background(), keyUser, got)).Should(Succeed())
+						Expect(got.Finalizers).To(ContainElement(infrav1beta1.Finalizer))
 					})
 				})
 
